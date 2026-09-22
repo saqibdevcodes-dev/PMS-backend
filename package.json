@@ -1,0 +1,83 @@
+{
+  "name": "enterprise-pms-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/src/server.js",
+    "worker": "tsx src/jobs/worker.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:integration": "vitest run tests/integration.test.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "openapi": "tsx scripts/openapi.ts",
+    "setup:env": "node scripts/setup-env.mjs",
+    "pretest": "npm run build",
+    "bootstrap": "node scripts/bootstrap.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1136.0",
+    "@aws-sdk/s3-request-presigner": "^3.1136.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "@prometheus-io/client": "^0.16.1",
+    "argon2": "^0.45.1",
+    "bullmq": "^6.3.8",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.1",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "file-type": "^22.1.1",
+    "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.12",
+    "luxon": "^3.7.2",
+    "multer": "^2.4.0",
+    "nodemailer": "^10.0.10",
+    "pdfkit": "^0.20.2",
+    "pg": "^8.23.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/luxon": "^3.7.5",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^26.6.2",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pdfkit": "^0.17.6",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.8",
+    "prisma": "^7.10.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "mysql2": "3.24.4",
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
+  }
+}

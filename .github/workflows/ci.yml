@@ -1,0 +1,30 @@
+name: Backend validation
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run setup:env
+      - run: docker compose up -d postgres redis storage mail --wait
+      - run: npm run db:generate
+      - run: npm run db:migrate
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test:unit
+      - run: npm test
+      - run: npm run build
+      - run: npm run openapi
+      - run: git diff --exit-code docs/openapi.json
+      - run: npm audit --audit-level=moderate
+      - if: always()
+        run: docker compose down -v

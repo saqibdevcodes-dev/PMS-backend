@@ -1,0 +1,883 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UnitStatus {
+  AVAILABLE
+  RESERVED
+  BOOKED
+  SOLD
+  BLOCKED
+  TRANSFER_PENDING
+  POSSESSION_READY
+  POSSESSED
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CONVERTED
+  EXPIRED
+  CANCELLED
+}
+
+enum BookingStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  CLEARED
+  REJECTED
+  BOUNCED
+  REVERSED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CONSUMED
+}
+
+enum WorkflowStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  REJECTED
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id            String              @id @default(uuid()) @db.Uuid
+  email         String              @unique
+  name          String
+  passwordHash  String
+  active        Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  roles         UserRole[]
+  projects      UserProjectAccess[]
+  sessions      Session[]
+  resets        PasswordReset[]
+  devices       Device[]
+  notifications Notification[]
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  key   String           @id
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId        String     @db.Uuid
+  permissionKey String
+  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionKey], references: [key], onDelete: Restrict)
+
+  @@id([roleId, permissionKey])
+}
+
+model UserRole {
+  userId String @db.Uuid
+  roleId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+}
+
+model UserProjectAccess {
+  userId    String  @db.Uuid
+  projectId String  @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@id([userId, projectId])
+}
+
+model Session {
+  id           String         @id @default(uuid()) @db.Uuid
+  userId       String         @db.Uuid
+  platform     String
+  deviceId     String?
+  createdAt    DateTime       @default(now())
+  lastActivity DateTime       @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  user         User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tokens       RefreshToken[]
+
+  @@index([userId, revokedAt])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  hash      String    @unique
+  sessionId String    @db.Uuid
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+  session   Session   @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+}
+
+model PasswordReset {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  hash      String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model Device {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  installationId String
+  platform       String
+  pushToken      String?
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, installationId])
+}
+
+model Project {
+  id                 String              @id @default(uuid()) @db.Uuid
+  code               String              @unique
+  name               String
+  currency           String              @default("PKR")
+  timezone           String              @default("Asia/Karachi")
+  reservationMinutes Int                 @default(60)
+  downPaymentPercent Decimal             @default(20) @db.Decimal(5, 2)
+  graceDays          Int                 @default(0)
+  ndcValidityDays    Int                 @default(30)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  access             UserProjectAccess[]
+  units              Unit[]
+  customers          Customer[]
+  leads              Lead[]
+  plans              PaymentPlan[]
+  dealers            Dealer[]
+  approvals          Approval[]
+  policies           ApprovalPolicy[]
+  accounts           Account[]
+  periods            AccountingPeriod[]
+  journals           Journal[]
+  settings           ProjectSetting[]
+  documents          Document[]
+  templates          DocumentTemplate[]
+  jobs               BackgroundJob[]
+  banks              BankAccount[]
+  vendors            Vendor[]
+}
+
+model ProjectSetting {
+  projectId String  @db.Uuid
+  key       String
+  value     Json
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, key])
+}
+
+model Unit {
+  id              String             @id @default(uuid()) @db.Uuid
+  projectId       String             @db.Uuid
+  number          String
+  type            String
+  phase           String?
+  block           String?
+  tower           String?
+  sector          String?
+  floor           String?
+  size            Decimal            @db.Decimal(12, 2)
+  measurementUnit String
+  features        String[]
+  price           Decimal            @db.Decimal(18, 2)
+  charges         Decimal            @default(0) @db.Decimal(18, 2)
+  status          UnitStatus         @default(AVAILABLE)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  history         UnitHistory[]
+  reservations    Reservation[]
+  bookings        Booking[]
+  allocations     DealerAllocation[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status, type])
+}
+
+model UnitHistory {
+  id        String     @id @default(uuid()) @db.Uuid
+  unitId    String     @db.Uuid
+  actorId   String     @db.Uuid
+  status    UnitStatus
+  price     Decimal    @db.Decimal(18, 2)
+  charges   Decimal    @db.Decimal(18, 2)
+  reason    String
+  createdAt DateTime   @default(now())
+  unit      Unit       @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  @@index([unitId, createdAt])
+}
+
+model Customer {
+  payments             Payment[]
+  notifications        Notification[]
+  id                   String            @id @default(uuid()) @db.Uuid
+  projectId            String            @db.Uuid
+  reference            String            @unique
+  name                 String
+  phone                String
+  email                String?
+  address              String?
+  identityEncrypted    String
+  identityHash         String
+  identityLast4        String
+  communicationConsent Boolean           @default(false)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  project              Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  contacts             CustomerContact[]
+  nominees             CustomerNominee[]
+  owners               BookingOwner[]
+  reservations         Reservation[]
+  bookings             Booking[]
+  leads                Lead[]
+  transfers            Transfer[]
+  documents            Document[]
+
+  @@unique([projectId, identityHash])
+  @@index([projectId, name])
+  @@index([projectId, phone])
+}
+
+model CustomerContact {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  kind       String
+  value      String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+}
+
+model CustomerNominee {
+  id           String   @id @default(uuid()) @db.Uuid
+  customerId   String   @db.Uuid
+  name         String
+  relationship String
+  phone        String
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+}
+
+model Lead {
+  id         String         @id @default(uuid()) @db.Uuid
+  projectId  String         @db.Uuid
+  name       String
+  phone      String
+  source     String
+  status     String         @default("NEW")
+  assignedTo String?        @db.Uuid
+  customerId String?        @db.Uuid
+  dealerId   String?        @db.Uuid
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  project    Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  customer   Customer?      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  dealer     Dealer?        @relation(fields: [dealerId], references: [id], onDelete: Restrict)
+  activities LeadActivity[]
+
+  @@index([projectId, status, assignedTo])
+}
+
+model LeadActivity {
+  id          String    @id @default(uuid()) @db.Uuid
+  leadId      String    @db.Uuid
+  kind        String
+  notes       String
+  scheduledAt DateTime?
+  amount      Decimal?  @db.Decimal(18, 2)
+  createdBy   String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Restrict)
+}
+
+model Reservation {
+  id         String            @id @default(uuid()) @db.Uuid
+  reference  String            @unique
+  unitId     String            @db.Uuid
+  customerId String            @db.Uuid
+  status     ReservationStatus @default(ACTIVE)
+  expiresAt  DateTime
+  createdBy  String            @db.Uuid
+  createdAt  DateTime          @default(now())
+  unit       Unit              @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  customer   Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  booking    Booking?
+
+  @@index([status, expiresAt])
+}
+
+model PaymentPlan {
+  id        String               @id @default(uuid()) @db.Uuid
+  projectId String               @db.Uuid
+  name      String
+  createdAt DateTime             @default(now())
+  project   Project              @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  versions  PaymentPlanVersion[]
+}
+
+model PaymentPlanVersion {
+  id        String      @id @default(uuid()) @db.Uuid
+  planId    String      @db.Uuid
+  version   Int
+  schedule  Json
+  createdBy String      @db.Uuid
+  createdAt DateTime    @default(now())
+  plan      PaymentPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  bookings  Booking[]
+
+  @@unique([planId, version])
+}
+
+model Booking {
+  id              String             @id @default(uuid()) @db.Uuid
+  reference       String             @unique
+  unitId          String             @db.Uuid
+  customerId      String             @db.Uuid
+  reservationId   String             @unique @db.Uuid
+  planVersionId   String             @db.Uuid
+  dealerId        String?            @db.Uuid
+  status          BookingStatus      @default(DRAFT)
+  basePrice       Decimal            @db.Decimal(18, 2)
+  charges         Decimal            @db.Decimal(18, 2)
+  discount        Decimal            @db.Decimal(18, 2)
+  total           Decimal            @db.Decimal(18, 2)
+  downPayment     Decimal            @db.Decimal(18, 2)
+  scheduleVersion Int                @default(1)
+  createdBy       String             @db.Uuid
+  approvedBy      String?            @db.Uuid
+  confirmedAt     DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  unit            Unit               @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  customer        Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  reservation     Reservation        @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  planVersion     PaymentPlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  dealer          Dealer?            @relation(fields: [dealerId], references: [id], onDelete: Restrict)
+  owners          BookingOwner[]
+  installments    Installment[]
+  payments        Payment[]
+  revisions       ScheduleRevision[]
+  recovery        RecoveryCase[]
+  commissions     DealerCommission[]
+  ndcs            Ndc[]
+  transfers       Transfer[]
+  cancellation    Cancellation?
+  possessions     Possession[]
+  documents       Document[]
+
+  @@index([unitId, status])
+}
+
+model BookingOwner {
+  id         String    @id @default(uuid()) @db.Uuid
+  bookingId  String    @db.Uuid
+  customerId String    @db.Uuid
+  share      Decimal   @db.Decimal(5, 2)
+  validFrom  DateTime  @default(now())
+  validTo    DateTime?
+  booking    Booking   @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId, validTo])
+}
+
+model Installment {
+  id          String              @id @default(uuid()) @db.Uuid
+  bookingId   String              @db.Uuid
+  sequence    Int
+  version     Int
+  label       String
+  dueDate     DateTime            @db.Date
+  amount      Decimal             @db.Decimal(18, 2)
+  superseded  Boolean             @default(false)
+  booking     Booking             @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  allocations PaymentAllocation[]
+
+  @@unique([bookingId, version, sequence])
+  @@index([dueDate, superseded])
+}
+
+model ScheduleRevision {
+  id         String   @id @default(uuid()) @db.Uuid
+  bookingId  String   @db.Uuid
+  version    Int
+  reason     String
+  approvedBy String   @db.Uuid
+  createdAt  DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@unique([bookingId, version])
+}
+
+model Payment {
+  payerId              String                @db.Uuid
+  payer                Customer              @relation(fields: [payerId], references: [id], onDelete: Restrict)
+  id                   String                @id @default(uuid()) @db.Uuid
+  bookingId            String                @db.Uuid
+  amount               Decimal               @db.Decimal(18, 2)
+  method               String
+  paidAt               DateTime
+  transactionReference String?
+  receivingAccountId   String                @db.Uuid
+  status               PaymentStatus         @default(PENDING)
+  receivedBy           String                @db.Uuid
+  verifiedBy           String?               @db.Uuid
+  verifiedAt           DateTime?
+  createdAt            DateTime              @default(now())
+  booking              Booking               @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  receivingAccount     Account               @relation(fields: [receivingAccountId], references: [id], onDelete: Restrict)
+  allocations          PaymentAllocation[]
+  receipt              Receipt?
+  verifications        PaymentVerification[]
+
+  @@index([bookingId, status])
+}
+
+model PaymentVerification {
+  id        String        @id @default(uuid()) @db.Uuid
+  paymentId String        @db.Uuid
+  actorId   String        @db.Uuid
+  status    PaymentStatus
+  reason    String
+  createdAt DateTime      @default(now())
+  payment   Payment       @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+}
+
+model PaymentAllocation {
+  id            String      @id @default(uuid()) @db.Uuid
+  paymentId     String      @db.Uuid
+  installmentId String      @db.Uuid
+  amount        Decimal     @db.Decimal(18, 2)
+  reversedAt    DateTime?
+  payment       Payment     @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  installment   Installment @relation(fields: [installmentId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, installmentId])
+}
+
+model Receipt {
+  id         String    @id @default(uuid()) @db.Uuid
+  reference  String    @unique
+  paymentId  String    @unique @db.Uuid
+  createdAt  DateTime  @default(now())
+  reversedAt DateTime?
+  payment    Payment   @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+}
+
+model RecoveryCase {
+  id         String             @id @default(uuid()) @db.Uuid
+  bookingId  String             @db.Uuid
+  assignedTo String             @db.Uuid
+  status     String             @default("OPEN")
+  createdAt  DateTime           @default(now())
+  booking    Booking            @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  activities RecoveryActivity[]
+}
+
+model RecoveryActivity {
+  id            String       @id @default(uuid()) @db.Uuid
+  caseId        String       @db.Uuid
+  kind          String
+  notes         String
+  promiseAmount Decimal?     @db.Decimal(18, 2)
+  promiseDate   DateTime?    @db.Date
+  createdBy     String       @db.Uuid
+  createdAt     DateTime     @default(now())
+  recoveryCase  RecoveryCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+}
+
+model Dealer {
+  id                String             @id @default(uuid()) @db.Uuid
+  projectId         String             @db.Uuid
+  name              String
+  phone             String
+  active            Boolean            @default(true)
+  commissionPercent Decimal            @default(0) @db.Decimal(5, 2)
+  createdAt         DateTime           @default(now())
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  bookings          Booking[]
+  leads             Lead[]
+  commissions       DealerCommission[]
+  allocations       DealerAllocation[]
+}
+
+model DealerAllocation {
+  dealerId  String   @db.Uuid
+  unitId    String   @db.Uuid
+  expiresAt DateTime
+  dealer    Dealer   @relation(fields: [dealerId], references: [id], onDelete: Restrict)
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  @@id([dealerId, unitId])
+}
+
+model DealerCommission {
+  id               String         @id @default(uuid()) @db.Uuid
+  dealerId         String         @db.Uuid
+  bookingId        String         @unique @db.Uuid
+  amount           Decimal        @db.Decimal(18, 2)
+  status           WorkflowStatus @default(PENDING)
+  settledAt        DateTime?
+  paymentReference String?
+  dealer           Dealer         @relation(fields: [dealerId], references: [id], onDelete: Restrict)
+  booking          Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+}
+
+model ApprovalPolicy {
+  id            String   @id @default(uuid()) @db.Uuid
+  projectId     String   @db.Uuid
+  operation     String
+  minimumAmount Decimal  @default(0) @db.Decimal(18, 2)
+  permissions   String[]
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, operation, minimumAmount])
+}
+
+model Approval {
+  id          String           @id @default(uuid()) @db.Uuid
+  projectId   String           @db.Uuid
+  operation   String
+  entityId    String           @db.Uuid
+  payload     Json
+  amount      Decimal          @db.Decimal(18, 2)
+  requestedBy String           @db.Uuid
+  permissions String[]
+  level       Int              @default(0)
+  status      ApprovalStatus   @default(PENDING)
+  createdAt   DateTime         @default(now())
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  actions     ApprovalAction[]
+
+  @@index([projectId, status])
+}
+
+model ApprovalAction {
+  id         String   @id @default(uuid()) @db.Uuid
+  approvalId String   @db.Uuid
+  actorId    String   @db.Uuid
+  level      Int
+  decision   String
+  comment    String
+  createdAt  DateTime @default(now())
+  approval   Approval @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+
+  @@unique([approvalId, level])
+}
+
+model Ndc {
+  id                String         @id @default(uuid()) @db.Uuid
+  reference         String         @unique
+  bookingId         String         @db.Uuid
+  status            WorkflowStatus @default(PENDING)
+  identityVerified  Boolean
+  documentsVerified Boolean
+  requestedBy       String         @db.Uuid
+  issuedAt          DateTime?
+  expiresAt         DateTime?
+  booking           Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  transfers         Transfer[]
+}
+
+model Transfer {
+  id               String         @id @default(uuid()) @db.Uuid
+  reference        String         @unique
+  bookingId        String         @db.Uuid
+  buyerId          String         @db.Uuid
+  ndcId            String         @db.Uuid
+  charges          Decimal        @db.Decimal(18, 2)
+  paidAt           DateTime?
+  paymentReference String?
+  status           WorkflowStatus @default(PENDING)
+  requestedBy      String         @db.Uuid
+  completedAt      DateTime?
+  booking          Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  buyer            Customer       @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  ndc              Ndc            @relation(fields: [ndcId], references: [id], onDelete: Restrict)
+}
+
+model Cancellation {
+  id          String         @id @default(uuid()) @db.Uuid
+  bookingId   String         @unique @db.Uuid
+  deduction   Decimal        @db.Decimal(18, 2)
+  refundable  Decimal        @db.Decimal(18, 2)
+  reason      String
+  status      WorkflowStatus @default(PENDING)
+  requestedBy String         @db.Uuid
+  completedAt DateTime?
+  booking     Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  refunds     Refund[]
+}
+
+model Refund {
+  id               String         @id @default(uuid()) @db.Uuid
+  cancellationId   String         @db.Uuid
+  amount           Decimal        @db.Decimal(18, 2)
+  status           WorkflowStatus @default(PENDING)
+  requestedBy      String         @db.Uuid
+  paidAt           DateTime?
+  paymentReference String?
+  cancellation     Cancellation   @relation(fields: [cancellationId], references: [id], onDelete: Restrict)
+}
+
+model Possession {
+  id              String         @id @default(uuid()) @db.Uuid
+  bookingId       String         @db.Uuid
+  status          WorkflowStatus @default(PENDING)
+  requestedBy     String         @db.Uuid
+  inspectionAt    DateTime?
+  inspectionNotes String?
+  handoverAt      DateTime?
+  snags           Snag[]
+  booking         Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+}
+
+model Snag {
+  id           String     @id @default(uuid()) @db.Uuid
+  possessionId String     @db.Uuid
+  description  String
+  resolvedAt   DateTime?
+  possession   Possession @relation(fields: [possessionId], references: [id], onDelete: Restrict)
+}
+
+model Account {
+  id        String        @id @default(uuid()) @db.Uuid
+  projectId String        @db.Uuid
+  code      String
+  name      String
+  type      AccountType
+  active    Boolean       @default(true)
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  lines     JournalLine[]
+  payments  Payment[]
+  banks     BankAccount[]
+
+  @@unique([projectId, code])
+}
+
+model AccountingPeriod {
+  id        String    @id @default(uuid()) @db.Uuid
+  projectId String    @db.Uuid
+  startDate DateTime  @db.Date
+  endDate   DateTime  @db.Date
+  locked    Boolean   @default(false)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  journals  Journal[]
+
+  @@index([projectId, startDate, endDate])
+}
+
+model Journal {
+  createdTransaction BigInt           @default(dbgenerated("txid_current()")) @ignore
+  id                 String           @id @default(uuid()) @db.Uuid
+  projectId          String           @db.Uuid
+  periodId           String           @db.Uuid
+  reference          String           @unique
+  source             String
+  sourceId           String           @db.Uuid
+  description        String
+  postedAt           DateTime
+  createdBy          String           @db.Uuid
+  reversalOfId       String?          @unique @db.Uuid
+  createdAt          DateTime         @default(now())
+  project            Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  period             AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  lines              JournalLine[]
+  reversalOf         Journal?         @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal           Journal?         @relation("JournalReversal")
+
+  @@unique([source, sourceId])
+  @@index([projectId, postedAt])
+}
+
+model JournalLine {
+  vendorId        String?              @db.Uuid
+  vendor          Vendor?              @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  id              String               @id @default(uuid()) @db.Uuid
+  journalId       String               @db.Uuid
+  accountId       String               @db.Uuid
+  debit           Decimal              @db.Decimal(18, 2)
+  credit          Decimal              @db.Decimal(18, 2)
+  journal         Journal              @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  account         Account              @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  reconciliations BankReconciliation[]
+
+  @@index([accountId, journalId])
+}
+
+model BankAccount {
+  id              String               @id @default(uuid()) @db.Uuid
+  projectId       String               @db.Uuid
+  accountId       String               @unique @db.Uuid
+  name            String
+  iban            String
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  account         Account              @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  reconciliations BankReconciliation[]
+}
+
+model BankReconciliation {
+  id                 String      @id @default(uuid()) @db.Uuid
+  bankAccountId      String      @db.Uuid
+  journalLineId      String      @unique @db.Uuid
+  statementReference String
+  statementDate      DateTime    @db.Date
+  reconciledBy       String      @db.Uuid
+  bankAccount        BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  journalLine        JournalLine @relation(fields: [journalLineId], references: [id], onDelete: Restrict)
+}
+
+model Vendor {
+  lines     JournalLine[]
+  id        String        @id @default(uuid()) @db.Uuid
+  projectId String        @db.Uuid
+  name      String
+  phone     String
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+}
+
+model Document {
+  id         String    @id @default(uuid()) @db.Uuid
+  projectId  String    @db.Uuid
+  customerId String?   @db.Uuid
+  bookingId  String?   @db.Uuid
+  key        String    @unique
+  name       String
+  mime       String
+  size       Int
+  sha256     String
+  uploadedBy String    @db.Uuid
+  createdAt  DateTime  @default(now())
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  booking    Booking?  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+}
+
+model DocumentTemplate {
+  id        String  @id @default(uuid()) @db.Uuid
+  projectId String  @db.Uuid
+  name      String
+  body      String
+  version   Int     @default(1)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, name, version])
+}
+
+model BackgroundJob {
+  id        String    @id @default(uuid()) @db.Uuid
+  projectId String    @db.Uuid
+  createdBy String    @db.Uuid
+  kind      String
+  payload   Json
+  status    JobStatus @default(PENDING)
+  resultKey String?
+  error     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Restrict)
+}
+
+model Outbox {
+  processedAt  DateTime?
+  id           String    @id @default(uuid()) @db.Uuid
+  kind         String
+  payload      Json
+  createdAt    DateTime  @default(now())
+  dispatchedAt DateTime?
+
+  @@index([dispatchedAt, createdAt])
+}
+
+model Notification {
+  customerId String?                @db.Uuid
+  recipient  String?
+  customer   Customer?              @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  id         String                 @id @default(uuid()) @db.Uuid
+  userId     String?                @db.Uuid
+  title      String
+  body       String
+  channel    String
+  readAt     DateTime?
+  createdAt  DateTime               @default(now())
+  user       User?                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  deliveries NotificationDelivery[]
+}
+
+model NotificationDelivery {
+  id             String       @id @default(uuid()) @db.Uuid
+  notificationId String       @db.Uuid
+  success        Boolean
+  error          String?
+  attemptedAt    DateTime     @default(now())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @db.Uuid
+  projectId String?  @db.Uuid
+  action    String
+  entityId  String?
+  requestId String
+  data      Json
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+model IdempotencyRecord {
+  key         String
+  actorId     String   @db.Uuid
+  operation   String
+  requestHash String
+  response    Json
+  createdAt   DateTime @default(now())
+
+  @@id([key, actorId, operation])
+}
+
+model ReferenceCounter {
+  prefix String @id
+  value  Int    @default(0)
+}
