@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import modelMetadata from './models.json' with { type: 'json' };
 import { responseSchema, extraSchemas } from './responses.js';
 import { routeDocs } from '../common/http.js';
 export function buildOpenApi() {
@@ -24,7 +24,7 @@ export function buildOpenApi() {
       },
     },
   };
-  for (const model of Prisma.dmmf.datamodel.models) {
+  for (const model of modelMetadata.models) {
     const properties: Record<string, unknown> = {};
     for (const field of model.fields) {
       if (
@@ -55,9 +55,7 @@ export function buildOpenApi() {
       if (field.kind === 'enum')
         schema = {
           type: 'string',
-          enum: Prisma.dmmf.datamodel.enums
-            .find((e) => e.name === field.type)
-            ?.values.map((v) => v.name),
+          enum: modelMetadata.enums.find((e) => e.name === field.type)?.values.map((v) => v.name),
         };
       if (field.isList) schema = { type: 'array', items: schema };
       if (!field.isRequired) schema = { anyOf: [schema, { type: 'null' }] };

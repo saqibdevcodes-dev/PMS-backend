@@ -18,7 +18,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:integration": "vitest run tests/integration.test.ts",
-    "db:generate": "prisma generate",
+    "db:generate": "prisma generate && node scripts/model-metadata.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "openapi": "tsx scripts/openapi.ts",

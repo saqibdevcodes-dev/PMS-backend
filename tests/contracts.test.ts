@@ -16,6 +16,20 @@ afterAll(async () => {
 });
 
 describe('generated API contract', () => {
+  it('preserves model list cardinality and enum choices', () => {
+    expect(spec.components.schemas.User).toMatchObject({
+      properties: { projects: { type: 'array' }, roles: { type: 'array' } },
+    });
+    expect(spec.components.schemas.Approval).toMatchObject({
+      properties: {
+        permissions: { type: 'array', items: { type: 'string' } },
+        status: {
+          type: 'string',
+          enum: expect.arrayContaining(['PENDING', 'APPROVED', 'REJECTED']),
+        },
+      },
+    });
+  });
   it('documents every registered operation exactly once', () => {
     const documented = Object.entries(spec.paths).flatMap(([path, methods]) =>
       Object.keys(methods).map((method) => method + ' ' + path),

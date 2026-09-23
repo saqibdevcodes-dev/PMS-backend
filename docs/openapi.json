@@ -24536,126 +24536,60 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "active": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "boolean"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "roles": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserRole"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserRole"
+            }
           },
           "projects": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserProjectAccess"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserProjectAccess"
+            }
           },
           "sessions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Session"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            }
           },
           "resets": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PasswordReset"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasswordReset"
+            }
           },
           "devices": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Device"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Device"
+            }
           },
           "notifications": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Notification"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
           }
         }
       },
@@ -24663,44 +24597,22 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "permissions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RolePermission"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RolePermission"
+            }
           },
           "users": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserRole"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserRole"
+            }
           }
         }
       },
@@ -24708,24 +24620,13 @@
         "type": "object",
         "properties": {
           "key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "roles": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RolePermission"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RolePermission"
+            }
           }
         }
       },
@@ -24733,44 +24634,16 @@
         "type": "object",
         "properties": {
           "roleId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "permissionKey": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "role": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Role"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Role"
           },
           "permission": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Permission"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Permission"
           }
         }
       },
@@ -24778,44 +24651,16 @@
         "type": "object",
         "properties": {
           "userId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "roleId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "user": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/User"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/User"
           },
           "role": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Role"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Role"
           }
         }
       },
@@ -24823,44 +24668,16 @@
         "type": "object",
         "properties": {
           "userId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "user": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/User"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/User"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           }
         }
       },
@@ -24868,34 +24685,13 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "userId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "platform": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "deviceId": {
             "anyOf": [
@@ -24908,37 +24704,16 @@
             ]
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "lastActivity": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "expiresAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "revokedAt": {
             "anyOf": [
@@ -24952,24 +24727,13 @@
             ]
           },
           "user": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/User"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/User"
           },
           "tokens": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RefreshToken"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefreshToken"
+            }
           }
         }
       },
@@ -24977,46 +24741,18 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "sessionId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "expiresAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "usedAt": {
             "anyOf": [
@@ -25030,14 +24766,7 @@
             ]
           },
           "session": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Session"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Session"
           }
         }
       },
@@ -25045,35 +24774,14 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "userId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "expiresAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "usedAt": {
             "anyOf": [
@@ -25087,14 +24795,7 @@
             ]
           },
           "user": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/User"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/User"
           }
         }
       },
@@ -25102,65 +24803,23 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "userId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "installationId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "platform": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "user": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/User"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/User"
           }
         }
       },
@@ -25168,286 +24827,141 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "currency": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "timezone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reservationMinutes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "downPaymentPercent": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "graceDays": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "ndcValidityDays": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "access": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserProjectAccess"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserProjectAccess"
+            }
           },
           "units": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Unit"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Unit"
+            }
           },
           "customers": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Customer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Customer"
+            }
           },
           "leads": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Lead"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Lead"
+            }
           },
           "plans": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PaymentPlan"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentPlan"
+            }
           },
           "dealers": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Dealer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Dealer"
+            }
           },
           "approvals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Approval"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Approval"
+            }
           },
           "policies": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ApprovalPolicy"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApprovalPolicy"
+            }
           },
           "accounts": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Account"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Account"
+            }
           },
           "periods": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AccountingPeriod"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountingPeriod"
+            }
           },
           "journals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Journal"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Journal"
+            }
           },
           "settings": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ProjectSetting"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectSetting"
+            }
           },
           "documents": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Document"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            }
           },
           "templates": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DocumentTemplate"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentTemplate"
+            }
           },
           "jobs": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BackgroundJob"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackgroundJob"
+            }
           },
           "banks": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BankAccount"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankAccount"
+            }
           },
           "vendors": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Vendor"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Vendor"
+            }
           }
         }
       },
@@ -25455,42 +24969,14 @@
         "type": "object",
         "properties": {
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
-          "value": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ]
-          },
+          "value": {},
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           }
         }
       },
@@ -25498,44 +24984,16 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "number": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "phase": {
             "anyOf": [
@@ -25588,136 +25046,70 @@
             ]
           },
           "size": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "measurementUnit": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "features": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "price": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "charges": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "RESERVED",
+              "BOOKED",
+              "SOLD",
+              "BLOCKED",
+              "TRANSFER_PENDING",
+              "POSSESSION_READY",
+              "POSSESSED"
             ]
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "history": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UnitHistory"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitHistory"
+            }
           },
           "reservations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Reservation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reservation"
+            }
           },
           "bookings": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Booking"
+            }
           },
           "allocations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DealerAllocation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DealerAllocation"
+            }
           }
         }
       },
@@ -25725,95 +25117,42 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "unitId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "actorId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "RESERVED",
+              "BOOKED",
+              "SOLD",
+              "BLOCKED",
+              "TRANSFER_PENDING",
+              "POSSESSION_READY",
+              "POSSESSED"
             ]
           },
           "price": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "charges": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "unit": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Unit"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Unit"
           }
         }
       },
@@ -25821,74 +25160,31 @@
         "type": "object",
         "properties": {
           "payments": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Payment"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Payment"
+            }
           },
           "notifications": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Notification"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
           },
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reference": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "email": {
             "anyOf": [
@@ -25911,136 +25207,69 @@
             ]
           },
           "identityLast4": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "communicationConsent": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "boolean"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "contacts": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CustomerContact"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerContact"
+            }
           },
           "nominees": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CustomerNominee"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerNominee"
+            }
           },
           "owners": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BookingOwner"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingOwner"
+            }
           },
           "reservations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Reservation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reservation"
+            }
           },
           "bookings": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Booking"
+            }
           },
           "leads": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Lead"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Lead"
+            }
           },
           "transfers": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Transfer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transfer"
+            }
           },
           "documents": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Document"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            }
           }
         }
       },
@@ -26048,54 +25277,19 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "customerId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "kind": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "customer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Customer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Customer"
           }
         }
       },
@@ -26103,64 +25297,22 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "customerId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "relationship": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "customer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Customer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Customer"
           }
         }
       },
@@ -26168,64 +25320,22 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "source": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "assignedTo": {
             "anyOf": [
@@ -26258,36 +25368,15 @@
             ]
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "customer": {
             "anyOf": [
@@ -26310,14 +25399,10 @@
             ]
           },
           "activities": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/LeadActivity"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeadActivity"
+            }
           }
         }
       },
@@ -26325,44 +25410,16 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "leadId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "kind": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "scheduledAt": {
             "anyOf": [
@@ -26386,35 +25443,14 @@
             ]
           },
           "createdBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "lead": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Lead"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Lead"
           }
         }
       },
@@ -26422,106 +25458,42 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reference": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "unitId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "customerId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "CONVERTED",
+              "EXPIRED",
+              "CANCELLED"
             ]
           },
           "expiresAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "createdBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "unit": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Unit"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Unit"
           },
           "customer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Customer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Customer"
           },
           "booking": {
             "anyOf": [
@@ -26539,65 +25511,26 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "versions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PaymentPlanVersion"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentPlanVersion"
+            }
           }
         }
       },
@@ -26605,83 +25538,30 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "planId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
-          "schedule": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ]
-          },
+          "schedule": {},
           "createdBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "plan": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PaymentPlan"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/PaymentPlan"
           },
           "bookings": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Booking"
+            }
           }
         }
       },
@@ -26689,64 +25569,22 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reference": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "unitId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "customerId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reservationId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "planVersionId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "dealerId": {
             "anyOf": [
@@ -26759,84 +25597,33 @@
             ]
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "CONFIRMED",
+              "CANCELLED"
             ]
           },
           "basePrice": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "charges": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "discount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "total": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "downPayment": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "scheduleVersion": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "createdBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "approvedBy": {
             "anyOf": [
@@ -26860,66 +25647,24 @@
             ]
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "unit": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Unit"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Unit"
           },
           "customer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Customer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Customer"
           },
           "reservation": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Reservation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Reservation"
           },
           "planVersion": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PaymentPlanVersion"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/PaymentPlanVersion"
           },
           "dealer": {
             "anyOf": [
@@ -26932,84 +25677,52 @@
             ]
           },
           "owners": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BookingOwner"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingOwner"
+            }
           },
           "installments": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Installment"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Installment"
+            }
           },
           "payments": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Payment"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Payment"
+            }
           },
           "revisions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ScheduleRevision"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleRevision"
+            }
           },
           "recovery": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RecoveryCase"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecoveryCase"
+            }
           },
           "commissions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DealerCommission"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DealerCommission"
+            }
           },
           "ndcs": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Ndc"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Ndc"
+            }
           },
           "transfers": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Transfer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transfer"
+            }
           },
           "cancellation": {
             "anyOf": [
@@ -27022,24 +25735,16 @@
             ]
           },
           "possessions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Possession"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Possession"
+            }
           },
           "documents": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Document"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            }
           }
         }
       },
@@ -27047,55 +25752,20 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "customerId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "share": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "validFrom": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "validTo": {
             "anyOf": [
@@ -27109,24 +25779,10 @@
             ]
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           },
           "customer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Customer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Customer"
           }
         }
       },
@@ -27134,105 +25790,38 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "sequence": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "dueDate": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "amount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "superseded": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "boolean"
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           },
           "allocations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PaymentAllocation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentAllocation"
+            }
           }
         }
       },
@@ -27240,75 +25829,26 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "approvedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           }
         }
       },
@@ -27316,75 +25856,26 @@
         "type": "object",
         "properties": {
           "payerId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "payer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Customer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Customer"
           },
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "amount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "method": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "paidAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "transactionReference": {
             "anyOf": [
@@ -27397,34 +25888,20 @@
             ]
           },
           "receivingAccountId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CLEARED",
+              "REJECTED",
+              "BOUNCED",
+              "REVERSED"
             ]
           },
           "receivedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "verifiedBy": {
             "anyOf": [
@@ -27448,45 +25925,20 @@
             ]
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           },
           "receivingAccount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Account"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Account"
           },
           "allocations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PaymentAllocation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentAllocation"
+            }
           },
           "receipt": {
             "anyOf": [
@@ -27499,14 +25951,10 @@
             ]
           },
           "verifications": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PaymentVerification"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentVerification"
+            }
           }
         }
       },
@@ -27514,75 +25962,33 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "paymentId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "actorId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CLEARED",
+              "REJECTED",
+              "BOUNCED",
+              "REVERSED"
             ]
           },
           "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "payment": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Payment"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Payment"
           }
         }
       },
@@ -27590,44 +25996,16 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "paymentId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "installmentId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "amount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "reversedAt": {
             "anyOf": [
@@ -27641,24 +26019,10 @@
             ]
           },
           "payment": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Payment"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Payment"
           },
           "installment": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Installment"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Installment"
           }
         }
       },
@@ -27666,45 +26030,17 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reference": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "paymentId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "reversedAt": {
             "anyOf": [
@@ -27718,14 +26054,7 @@
             ]
           },
           "payment": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Payment"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Payment"
           }
         }
       },
@@ -27733,75 +26062,29 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "assignedTo": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           },
           "activities": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RecoveryActivity"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecoveryActivity"
+            }
           }
         }
       },
@@ -27809,44 +26092,16 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "caseId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "kind": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "promiseAmount": {
             "anyOf": [
@@ -27870,35 +26125,14 @@
             ]
           },
           "createdBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "recoveryCase": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RecoveryCase"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/RecoveryCase"
           }
         }
       },
@@ -27906,125 +26140,53 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "active": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "boolean"
           },
           "commissionPercent": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "bookings": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Booking"
+            }
           },
           "leads": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Lead"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Lead"
+            }
           },
           "commissions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DealerCommission"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DealerCommission"
+            }
           },
           "allocations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DealerAllocation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DealerAllocation"
+            }
           }
         }
       },
@@ -28032,55 +26194,20 @@
         "type": "object",
         "properties": {
           "dealerId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "unitId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "expiresAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "dealer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Dealer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Dealer"
           },
           "unit": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Unit"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Unit"
           }
         }
       },
@@ -28088,53 +26215,24 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "dealerId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "amount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "COMPLETED",
+              "REJECTED"
             ]
           },
           "settledAt": {
@@ -28159,24 +26257,10 @@
             ]
           },
           "dealer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Dealer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Dealer"
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           }
         }
       },
@@ -28184,64 +26268,25 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "operation": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "minimumAmount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "permissions": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           }
         }
       },
@@ -28249,133 +26294,54 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "operation": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "entityId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
-          "payload": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ]
-          },
+          "payload": {},
           "amount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "requestedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "permissions": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "level": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REJECTED",
+              "CONSUMED"
             ]
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "actions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ApprovalAction"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApprovalAction"
+            }
           }
         }
       },
@@ -28383,85 +26349,29 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "approvalId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "actorId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "level": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "decision": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "comment": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "approval": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Approval"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Approval"
           }
         }
       },
@@ -28469,74 +26379,31 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reference": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "COMPLETED",
+              "REJECTED"
             ]
           },
           "identityVerified": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "boolean"
           },
           "documentsVerified": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "boolean"
           },
           "requestedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "issuedAt": {
             "anyOf": [
@@ -28561,24 +26428,13 @@
             ]
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           },
           "transfers": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Transfer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transfer"
+            }
           }
         }
       },
@@ -28586,64 +26442,22 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reference": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "buyerId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "ndcId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "charges": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "paidAt": {
             "anyOf": [
@@ -28667,24 +26481,16 @@
             ]
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "COMPLETED",
+              "REJECTED"
             ]
           },
           "requestedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "completedAt": {
             "anyOf": [
@@ -28698,34 +26504,13 @@
             ]
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           },
           "buyer": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Customer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Customer"
           },
           "ndc": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Ndc"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Ndc"
           }
         }
       },
@@ -28733,74 +26518,31 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "deduction": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "refundable": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "COMPLETED",
+              "REJECTED"
             ]
           },
           "requestedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "completedAt": {
             "anyOf": [
@@ -28814,24 +26556,13 @@
             ]
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           },
           "refunds": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Refund"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Refund"
+            }
           }
         }
       },
@@ -28839,54 +26570,25 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "cancellationId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "amount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "COMPLETED",
+              "REJECTED"
             ]
           },
           "requestedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "paidAt": {
             "anyOf": [
@@ -28910,14 +26612,7 @@
             ]
           },
           "cancellation": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Cancellation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Cancellation"
           }
         }
       },
@@ -28925,44 +26620,22 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bookingId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "COMPLETED",
+              "REJECTED"
             ]
           },
           "requestedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "inspectionAt": {
             "anyOf": [
@@ -28997,24 +26670,13 @@
             ]
           },
           "snags": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Snag"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Snag"
+            }
           },
           "booking": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Booking"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Booking"
           }
         }
       },
@@ -29022,34 +26684,13 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "possessionId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "resolvedAt": {
             "anyOf": [
@@ -29063,14 +26704,7 @@
             ]
           },
           "possession": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Possession"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Possession"
           }
         }
       },
@@ -29078,104 +26712,50 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "EQUITY",
+              "REVENUE",
+              "EXPENSE"
             ]
           },
           "active": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "boolean"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "lines": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/JournalLine"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalLine"
+            }
           },
           "payments": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Payment"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Payment"
+            }
           },
           "banks": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BankAccount"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankAccount"
+            }
           }
         }
       },
@@ -29183,76 +26763,30 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "startDate": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "endDate": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "locked": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "boolean"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "journals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Journal"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Journal"
+            }
           }
         }
       },
@@ -29260,95 +26794,32 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "periodId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reference": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "source": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "sourceId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "postedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "createdBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "reversalOfId": {
             "anyOf": [
@@ -29361,45 +26832,20 @@
             ]
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "period": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AccountingPeriod"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/AccountingPeriod"
           },
           "lines": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/JournalLine"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalLine"
+            }
           },
           "reversalOf": {
             "anyOf": [
@@ -29447,84 +26893,31 @@
             ]
           },
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "journalId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "accountId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "debit": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "credit": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Money"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Money"
           },
           "journal": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Journal"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Journal"
           },
           "account": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Account"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Account"
           },
           "reconciliations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BankReconciliation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankReconciliation"
+            }
           }
         }
       },
@@ -29532,84 +26925,31 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "accountId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "iban": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "account": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Account"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Account"
           },
           "reconciliations": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BankReconciliation"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankReconciliation"
+            }
           }
         }
       },
@@ -29617,85 +26957,29 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bankAccountId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "journalLineId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "statementReference": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "statementDate": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "reconciledBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "bankAccount": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BankAccount"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/BankAccount"
           },
           "journalLine": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/JournalLine"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/JournalLine"
           }
         }
       },
@@ -29703,64 +26987,25 @@
         "type": "object",
         "properties": {
           "lines": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/JournalLine"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalLine"
+            }
           },
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           }
         }
       },
@@ -29768,24 +27013,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "customerId": {
             "anyOf": [
@@ -29808,85 +27039,29 @@
             ]
           },
           "key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "mime": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "size": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "sha256": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "uploadedBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           },
           "customer": {
             "anyOf": [
@@ -29914,64 +27089,22 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "body": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           }
         }
       },
@@ -29979,61 +27112,25 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "projectId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "createdBy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "kind": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
-          "payload": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ]
-          },
+          "payload": {},
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PROCESSING",
+              "COMPLETED",
+              "FAILED"
             ]
           },
           "resultKey": {
@@ -30057,36 +27154,15 @@
             ]
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "updatedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Project"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Project"
           }
         }
       },
@@ -30105,43 +27181,15 @@
             ]
           },
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "kind": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
-          "payload": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ]
-          },
+          "payload": {},
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "dispatchedAt": {
             "anyOf": [
@@ -30190,14 +27238,7 @@
             ]
           },
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "userId": {
             "anyOf": [
@@ -30210,34 +27251,13 @@
             ]
           },
           "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "body": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "channel": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "readAt": {
             "anyOf": [
@@ -30251,15 +27271,8 @@
             ]
           },
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "user": {
             "anyOf": [
@@ -30272,14 +27285,10 @@
             ]
           },
           "deliveries": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NotificationDelivery"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationDelivery"
+            }
           }
         }
       },
@@ -30287,34 +27296,13 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "notificationId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "success": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "boolean"
           },
           "error": {
             "anyOf": [
@@ -30327,25 +27315,11 @@
             ]
           },
           "attemptedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           },
           "notification": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Notification"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/Notification"
           }
         }
       },
@@ -30353,14 +27327,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "actorId": {
             "anyOf": [
@@ -30383,14 +27350,7 @@
             ]
           },
           "action": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "entityId": {
             "anyOf": [
@@ -30403,33 +27363,12 @@
             ]
           },
           "requestId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
-          "data": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ]
-          },
+          "data": {},
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -30437,63 +27376,21 @@
         "type": "object",
         "properties": {
           "key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "actorId": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "operation": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "requestHash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
-          "response": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
-            ]
-          },
+          "response": {},
           "createdAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -30501,24 +27398,10 @@
         "type": "object",
         "properties": {
           "prefix": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "string"
           },
           "value": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "integer"
           }
         }
       },

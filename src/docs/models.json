@@ -1,0 +1,4440 @@
+{
+  "models": [
+    {
+      "name": "User",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "passwordHash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "active",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "roles",
+          "type": "UserRole",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "projects",
+          "type": "UserProjectAccess",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "sessions",
+          "type": "Session",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "resets",
+          "type": "PasswordReset",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "devices",
+          "type": "Device",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "notifications",
+          "type": "Notification",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Role",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "permissions",
+          "type": "RolePermission",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "users",
+          "type": "UserRole",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Permission",
+      "fields": [
+        {
+          "name": "key",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "roles",
+          "type": "RolePermission",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "RolePermission",
+      "fields": [
+        {
+          "name": "roleId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "permissionKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "role",
+          "type": "Role",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "permission",
+          "type": "Permission",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "UserRole",
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "roleId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "user",
+          "type": "User",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "role",
+          "type": "Role",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "UserProjectAccess",
+      "fields": [
+        {
+          "name": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "user",
+          "type": "User",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Session",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "platform",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "deviceId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "lastActivity",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "revokedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "user",
+          "type": "User",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "tokens",
+          "type": "RefreshToken",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "RefreshToken",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "hash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "sessionId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "usedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "session",
+          "type": "Session",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "PasswordReset",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "hash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "usedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "user",
+          "type": "User",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Device",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "installationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "platform",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "pushToken",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "user",
+          "type": "User",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Project",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "code",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "currency",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "timezone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reservationMinutes",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "downPaymentPercent",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "graceDays",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "ndcValidityDays",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "access",
+          "type": "UserProjectAccess",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "units",
+          "type": "Unit",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "customers",
+          "type": "Customer",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "leads",
+          "type": "Lead",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "plans",
+          "type": "PaymentPlan",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "dealers",
+          "type": "Dealer",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "approvals",
+          "type": "Approval",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "policies",
+          "type": "ApprovalPolicy",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "accounts",
+          "type": "Account",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "periods",
+          "type": "AccountingPeriod",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "journals",
+          "type": "Journal",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "settings",
+          "type": "ProjectSetting",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "documents",
+          "type": "Document",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "templates",
+          "type": "DocumentTemplate",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "jobs",
+          "type": "BackgroundJob",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "banks",
+          "type": "BankAccount",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "vendors",
+          "type": "Vendor",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "ProjectSetting",
+      "fields": [
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "key",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "value",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Unit",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "number",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "type",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "phase",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "block",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "tower",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "sector",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "floor",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "size",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "measurementUnit",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "features",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "price",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "charges",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "UnitStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "history",
+          "type": "UnitHistory",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "reservations",
+          "type": "Reservation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "bookings",
+          "type": "Booking",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "allocations",
+          "type": "DealerAllocation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "UnitHistory",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "unitId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "actorId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "UnitStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "price",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "charges",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "unit",
+          "type": "Unit",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Customer",
+      "fields": [
+        {
+          "name": "payments",
+          "type": "Payment",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "notifications",
+          "type": "Notification",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "phone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "address",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "identityEncrypted",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "identityHash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "identityLast4",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "communicationConsent",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "contacts",
+          "type": "CustomerContact",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "nominees",
+          "type": "CustomerNominee",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "owners",
+          "type": "BookingOwner",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "reservations",
+          "type": "Reservation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "bookings",
+          "type": "Booking",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "leads",
+          "type": "Lead",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "transfers",
+          "type": "Transfer",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "documents",
+          "type": "Document",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "CustomerContact",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "value",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "CustomerNominee",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "relationship",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "phone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Lead",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "phone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "source",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "assignedTo",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "customerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "dealerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "dealer",
+          "type": "Dealer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "activities",
+          "type": "LeadActivity",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "LeadActivity",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "leadId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "notes",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "scheduledAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "lead",
+          "type": "Lead",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Reservation",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "unitId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "ReservationStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "unit",
+          "type": "Unit",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        }
+      ]
+    },
+    {
+      "name": "PaymentPlan",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "versions",
+          "type": "PaymentPlanVersion",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "PaymentPlanVersion",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "planId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "version",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "schedule",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "plan",
+          "type": "PaymentPlan",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookings",
+          "type": "Booking",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Booking",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "unitId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reservationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "planVersionId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "dealerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "status",
+          "type": "BookingStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "basePrice",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "charges",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "discount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "total",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "downPayment",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "scheduleVersion",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "approvedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "confirmedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "unit",
+          "type": "Unit",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reservation",
+          "type": "Reservation",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "planVersion",
+          "type": "PaymentPlanVersion",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "dealer",
+          "type": "Dealer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "owners",
+          "type": "BookingOwner",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "installments",
+          "type": "Installment",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "payments",
+          "type": "Payment",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "revisions",
+          "type": "ScheduleRevision",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "recovery",
+          "type": "RecoveryCase",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "commissions",
+          "type": "DealerCommission",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "ndcs",
+          "type": "Ndc",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "transfers",
+          "type": "Transfer",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "cancellation",
+          "type": "Cancellation",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "possessions",
+          "type": "Possession",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "documents",
+          "type": "Document",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "BookingOwner",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "share",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "validFrom",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "validTo",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Installment",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "sequence",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "version",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "label",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "dueDate",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "superseded",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "allocations",
+          "type": "PaymentAllocation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "ScheduleRevision",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "version",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "approvedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "fields": [
+        {
+          "name": "payerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "payer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "method",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paidAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "transactionReference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "receivingAccountId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "PaymentStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "receivedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "verifiedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "verifiedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "receivingAccount",
+          "type": "Account",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "allocations",
+          "type": "PaymentAllocation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "receipt",
+          "type": "Receipt",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "verifications",
+          "type": "PaymentVerification",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "PaymentVerification",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paymentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "actorId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "PaymentStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "payment",
+          "type": "Payment",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "PaymentAllocation",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paymentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "installmentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reversedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "payment",
+          "type": "Payment",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "installment",
+          "type": "Installment",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Receipt",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paymentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reversedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "payment",
+          "type": "Payment",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "RecoveryCase",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "assignedTo",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "activities",
+          "type": "RecoveryActivity",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "RecoveryActivity",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "caseId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "notes",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "promiseAmount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "promiseDate",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "recoveryCase",
+          "type": "RecoveryCase",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Dealer",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "phone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "active",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "commissionPercent",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookings",
+          "type": "Booking",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "leads",
+          "type": "Lead",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "commissions",
+          "type": "DealerCommission",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "allocations",
+          "type": "DealerAllocation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "DealerAllocation",
+      "fields": [
+        {
+          "name": "dealerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "unitId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "dealer",
+          "type": "Dealer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "unit",
+          "type": "Unit",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "DealerCommission",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "dealerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "WorkflowStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "settledAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "paymentReference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "dealer",
+          "type": "Dealer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "ApprovalPolicy",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "operation",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "minimumAmount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "permissions",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Approval",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "operation",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "entityId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "payload",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "requestedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "permissions",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "level",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "ApprovalStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "actions",
+          "type": "ApprovalAction",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "ApprovalAction",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "approvalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "actorId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "level",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "decision",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "comment",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "approval",
+          "type": "Approval",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Ndc",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "WorkflowStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "identityVerified",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "documentsVerified",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "requestedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "issuedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "transfers",
+          "type": "Transfer",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Transfer",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "buyerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "ndcId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "charges",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paidAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "paymentReference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "status",
+          "type": "WorkflowStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "requestedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "completedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "buyer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "ndc",
+          "type": "Ndc",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Cancellation",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "deduction",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "refundable",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "WorkflowStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "requestedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "completedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "refunds",
+          "type": "Refund",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Refund",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "cancellationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "WorkflowStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "requestedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paidAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "paymentReference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "cancellation",
+          "type": "Cancellation",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Possession",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "WorkflowStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "requestedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "inspectionAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "inspectionNotes",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "handoverAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "snags",
+          "type": "Snag",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Snag",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "possessionId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "resolvedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "possession",
+          "type": "Possession",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Account",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "code",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "type",
+          "type": "AccountType",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "active",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "lines",
+          "type": "JournalLine",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "payments",
+          "type": "Payment",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "banks",
+          "type": "BankAccount",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "AccountingPeriod",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "startDate",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "endDate",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "locked",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journals",
+          "type": "Journal",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Journal",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "periodId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "source",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "sourceId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "postedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reversalOfId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "period",
+          "type": "AccountingPeriod",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "lines",
+          "type": "JournalLine",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "reversalOf",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "reversal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        }
+      ]
+    },
+    {
+      "name": "JournalLine",
+      "fields": [
+        {
+          "name": "vendorId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "vendor",
+          "type": "Vendor",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "accountId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "debit",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "credit",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "account",
+          "type": "Account",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reconciliations",
+          "type": "BankReconciliation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "BankAccount",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "accountId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "iban",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "account",
+          "type": "Account",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reconciliations",
+          "type": "BankReconciliation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "BankReconciliation",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bankAccountId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journalLineId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "statementReference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "statementDate",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reconciledBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "bankAccount",
+          "type": "BankAccount",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journalLine",
+          "type": "JournalLine",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Vendor",
+      "fields": [
+        {
+          "name": "lines",
+          "type": "JournalLine",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "phone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Document",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "bookingId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "key",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "mime",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "size",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "sha256",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "uploadedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "booking",
+          "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        }
+      ]
+    },
+    {
+      "name": "DocumentTemplate",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "body",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "version",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "BackgroundJob",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "payload",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "JobStatus",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "resultKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "error",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Outbox",
+      "fields": [
+        {
+          "name": "processedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "payload",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "dispatchedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        }
+      ]
+    },
+    {
+      "name": "Notification",
+      "fields": [
+        {
+          "name": "customerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "recipient",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "customer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "body",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "channel",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "readAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "user",
+          "type": "User",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "deliveries",
+          "type": "NotificationDelivery",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "NotificationDelivery",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "notificationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "success",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "error",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "attemptedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "notification",
+          "type": "Notification",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "AuditLog",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "actorId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "action",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "entityId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "requestId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "data",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "IdempotencyRecord",
+      "fields": [
+        {
+          "name": "key",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "actorId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "operation",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "requestHash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "response",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "ReferenceCounter",
+      "fields": [
+        {
+          "name": "prefix",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "value",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    }
+  ],
+  "enums": [
+    {
+      "name": "UnitStatus",
+      "values": [
+        {
+          "name": "AVAILABLE"
+        },
+        {
+          "name": "RESERVED"
+        },
+        {
+          "name": "BOOKED"
+        },
+        {
+          "name": "SOLD"
+        },
+        {
+          "name": "BLOCKED"
+        },
+        {
+          "name": "TRANSFER_PENDING"
+        },
+        {
+          "name": "POSSESSION_READY"
+        },
+        {
+          "name": "POSSESSED"
+        }
+      ]
+    },
+    {
+      "name": "ReservationStatus",
+      "values": [
+        {
+          "name": "ACTIVE"
+        },
+        {
+          "name": "CONVERTED"
+        },
+        {
+          "name": "EXPIRED"
+        },
+        {
+          "name": "CANCELLED"
+        }
+      ]
+    },
+    {
+      "name": "BookingStatus",
+      "values": [
+        {
+          "name": "DRAFT"
+        },
+        {
+          "name": "CONFIRMED"
+        },
+        {
+          "name": "CANCELLED"
+        }
+      ]
+    },
+    {
+      "name": "PaymentStatus",
+      "values": [
+        {
+          "name": "PENDING"
+        },
+        {
+          "name": "CLEARED"
+        },
+        {
+          "name": "REJECTED"
+        },
+        {
+          "name": "BOUNCED"
+        },
+        {
+          "name": "REVERSED"
+        }
+      ]
+    },
+    {
+      "name": "ApprovalStatus",
+      "values": [
+        {
+          "name": "PENDING"
+        },
+        {
+          "name": "APPROVED"
+        },
+        {
+          "name": "REJECTED"
+        },
+        {
+          "name": "CONSUMED"
+        }
+      ]
+    },
+    {
+      "name": "WorkflowStatus",
+      "values": [
+        {
+          "name": "PENDING"
+        },
+        {
+          "name": "APPROVED"
+        },
+        {
+          "name": "COMPLETED"
+        },
+        {
+          "name": "REJECTED"
+        }
+      ]
+    },
+    {
+      "name": "AccountType",
+      "values": [
+        {
+          "name": "ASSET"
+        },
+        {
+          "name": "LIABILITY"
+        },
+        {
+          "name": "EQUITY"
+        },
+        {
+          "name": "REVENUE"
+        },
+        {
+          "name": "EXPENSE"
+        }
+      ]
+    },
+    {
+      "name": "JobStatus",
+      "values": [
+        {
+          "name": "PENDING"
+        },
+        {
+          "name": "PROCESSING"
+        },
+        {
+          "name": "COMPLETED"
+        },
+        {
+          "name": "FAILED"
+        }
+      ]
+    }
+  ]
+}
