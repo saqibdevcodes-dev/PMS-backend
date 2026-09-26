@@ -1,5 +1,7 @@
+name: pms
 services:
   postgres:
+    restart: unless-stopped
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: pms
@@ -12,6 +14,7 @@ services:
       interval: 5s
       retries: 20
   redis:
+    restart: unless-stopped
     image: redis:7-alpine
     command: ['redis-server', '--appendonly', 'yes']
     ports: ['127.0.0.1:6381:6379']
@@ -21,14 +24,22 @@ services:
       interval: 5s
       retries: 20
   storage:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    # Community build pinned because the original MinIO registry image is unavailable.
+    image: ghcr.io/coollabsio/minio@sha256:69b55a1c1c5dc285ce04db96689f5b2102317fc77a50680a1874ca6efd1c87f9
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
     ports: ['127.0.0.1:9002:9000', '127.0.0.1:9003:9001']
     volumes: ['storage-data:/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'mc alias set health http://127.0.0.1:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null && mc ready health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
   mail:
+    restart: unless-stopped
     image: axllent/mailpit:v1.27
     ports: ['127.0.0.1:1025:1025', '127.0.0.1:8025:8025']
   api:
@@ -45,6 +56,8 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      storage: { condition: service_healthy }
+      mail: { condition: service_started }
   worker:
     profiles: ['app']
     restart: unless-stopped
@@ -62,6 +75,8 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      storage: { condition: service_healthy }
+      mail: { condition: service_started }
 volumes:
   postgres-data:
   redis-data:
