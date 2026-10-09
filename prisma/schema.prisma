@@ -67,11 +67,20 @@ enum JobStatus {
   FAILED
 }
 
+enum AccountTypeScope {
+  STAFF
+  CUSTOMER
+}
+
 model User {
+  photoId       String? @db.Uuid
+  photo         ImageAsset? @relation("UserPhoto", fields: [photoId], references: [id], onDelete: Restrict)
   id            String              @id @default(uuid()) @db.Uuid
   email         String              @unique
   name          String
   passwordHash  String
+  accountType   AccountTypeScope    @default(STAFF)
+  portalCustomers Customer[]
   active        Boolean             @default(true)
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
@@ -169,6 +178,8 @@ model Device {
 }
 
 model Project {
+  photoId       String? @db.Uuid
+  photo         ImageAsset? @relation("ProjectPhoto", fields: [photoId], references: [id], onDelete: Restrict)
   id                 String              @id @default(uuid()) @db.Uuid
   code               String              @unique
   name               String
@@ -209,6 +220,10 @@ model ProjectSetting {
 }
 
 model Unit {
+  photoId       String? @db.Uuid
+  photo         ImageAsset? @relation("UnitPhoto", fields: [photoId], references: [id], onDelete: Restrict)
+  typeDetails   String?
+  featureImages Json @default("[]")
   id              String             @id @default(uuid()) @db.Uuid
   projectId       String             @db.Uuid
   number          String
@@ -251,6 +266,11 @@ model UnitHistory {
 }
 
 model Customer {
+  photoId              String?           @db.Uuid
+  photo                ImageAsset?       @relation("CustomerPhoto", fields: [photoId], references: [id], onDelete: Restrict)
+  portalUserId         String?           @db.Uuid
+  portalUser           User?             @relation(fields: [portalUserId], references: [id], onDelete: Restrict)
+  portalInvitations    CustomerInvitation[]
   payments             Payment[]
   notifications        Notification[]
   id                   String            @id @default(uuid()) @db.Uuid
@@ -279,6 +299,22 @@ model Customer {
   @@unique([projectId, identityHash])
   @@index([projectId, name])
   @@index([projectId, phone])
+  @@index([portalUserId])
+}
+
+model CustomerInvitation {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @db.Uuid
+  email      String
+  hash       String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  revokedAt  DateTime?
+  createdBy  String    @db.Uuid
+  createdAt  DateTime  @default(now())
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, createdAt])
 }
 
 model CustomerContact {
@@ -450,6 +486,9 @@ model ScheduleRevision {
 }
 
 model Payment {
+  proofImageId  String? @db.Uuid
+  proofImage    ImageAsset? @relation("PaymentProof", fields: [proofImageId], references: [id], onDelete: Restrict)
+  methodDetails String?
   payerId              String                @db.Uuid
   payer                Customer              @relation(fields: [payerId], references: [id], onDelete: Restrict)
   id                   String                @id @default(uuid()) @db.Uuid
@@ -527,6 +566,8 @@ model RecoveryActivity {
 }
 
 model Dealer {
+  photoId       String? @db.Uuid
+  photo         ImageAsset? @relation("DealerPhoto", fields: [photoId], references: [id], onDelete: Restrict)
   id                String             @id @default(uuid()) @db.Uuid
   projectId         String             @db.Uuid
   name              String
@@ -777,6 +818,7 @@ model Vendor {
 }
 
 model Document {
+  portalVisible Boolean @default(false)
   id         String    @id @default(uuid()) @db.Uuid
   projectId  String    @db.Uuid
   customerId String?   @db.Uuid
@@ -880,4 +922,24 @@ model IdempotencyRecord {
 model ReferenceCounter {
   prefix String @id
   value  Int    @default(0)
+}
+
+model ImageAsset {
+  id String @id @default(uuid()) @db.Uuid
+  projectId String? @db.Uuid
+  uploadedBy String @db.Uuid
+  purpose String
+  key String @unique
+  name String
+  mime String
+  size Int
+  createdAt DateTime @default(now())
+  users User[] @relation("UserPhoto")
+  projects Project[] @relation("ProjectPhoto")
+  units Unit[] @relation("UnitPhoto")
+  dealers Dealer[] @relation("DealerPhoto")
+  customers Customer[] @relation("CustomerPhoto")
+  payments Payment[] @relation("PaymentProof")
+  @@index([projectId, purpose])
+  @@index([uploadedBy])
 }

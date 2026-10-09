@@ -2,6 +2,7 @@ import { z } from 'zod';
 import modelMetadata from './models.json' with { type: 'json' };
 import { responseSchema, extraSchemas } from './responses.js';
 import { routeDocs } from '../common/http.js';
+import { portalContract } from '../modules/portal/contracts.js';
 export function buildOpenApi() {
   const schemas: Record<string, unknown> = {
     Money: {
@@ -66,6 +67,7 @@ export function buildOpenApi() {
   Object.assign(schemas, extraSchemas);
   const paths: Record<string, Record<string, unknown>> = {};
   for (const route of routeDocs) {
+    const portalResponse = portalContract(route.path, route.method);
     const path = route.path.replace(/:([A-Za-z]+)/g, '{$1}');
     const parameters: unknown[] = [];
     for (const match of route.path.matchAll(/:([A-Za-z]+)/g))
@@ -129,23 +131,24 @@ export function buildOpenApi() {
             required: ['success', 'data', 'meta'],
             properties: {
               success: { const: true },
-              data: route.response
-                ? z.toJSONSchema(route.response)
-                : route.path === '/metrics'
-                  ? { type: 'string' }
-                  : responseSchema(
-                      route.path,
-                      route.method,
-                      Boolean(
-                        route.query &&
-                        'properties' in
-                          z.toJSONSchema(route.query, { io: 'input', unrepresentable: 'any' }) &&
-                        (
-                          z.toJSONSchema(route.query, { io: 'input', unrepresentable: 'any' })
-                            .properties ?? {}
-                        ).page,
+              data:
+                route.response || portalResponse
+                  ? z.toJSONSchema((route.response || portalResponse)!)
+                  : route.path === '/metrics'
+                    ? { type: 'string' }
+                    : responseSchema(
+                        route.path,
+                        route.method,
+                        Boolean(
+                          route.query &&
+                          'properties' in
+                            z.toJSONSchema(route.query, { io: 'input', unrepresentable: 'any' }) &&
+                          (
+                            z.toJSONSchema(route.query, { io: 'input', unrepresentable: 'any' })
+                              .properties ?? {}
+                          ).page,
+                        ),
                       ),
-                    ),
               meta: {
                 type: 'object',
                 required: ['requestId'],
@@ -179,6 +182,7 @@ export function buildOpenApi() {
         : {}),
       responses,
       'x-permission': route.permission ?? null,
+      'x-audience': route.public ? 'public' : (route.audience ?? 'staff'),
     };
   }
   return {

@@ -15,6 +15,8 @@ import { redis, throttle } from './integrations/redis.js';
 import { storage } from './integrations/storage.js';
 import { AppError } from './common/errors.js';
 import { endpoint, pageQuery, id, paged, pagination } from './common/http.js';
+import { portalRoutes } from './modules/portal/routes.js';
+import { imageRoutes } from './modules/images/routes.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { foundationRoutes } from './modules/foundation/routes.js';
 import { salesRoutes } from './modules/sales/routes.js';
@@ -149,6 +151,8 @@ export function createApp() {
     },
   );
   authRoutes(app);
+  portalRoutes(app);
+  imageRoutes(app);
   foundationRoutes(app);
   salesRoutes(app);
   workflowRoutes(app);

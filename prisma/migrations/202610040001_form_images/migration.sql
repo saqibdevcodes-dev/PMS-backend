@@ -1,0 +1,20 @@
+CREATE TABLE "ImageAsset" (
+  "id" UUID PRIMARY KEY,
+  "projectId" UUID,
+  "uploadedBy" UUID NOT NULL,
+  "purpose" TEXT NOT NULL,
+  "key" TEXT NOT NULL UNIQUE,
+  "name" TEXT NOT NULL,
+  "mime" TEXT NOT NULL,
+  "size" INTEGER NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX "ImageAsset_projectId_purpose_idx" ON "ImageAsset"("projectId", "purpose");
+CREATE INDEX "ImageAsset_uploadedBy_idx" ON "ImageAsset"("uploadedBy");
+ALTER TABLE "Project" ADD COLUMN "photoId" UUID REFERENCES "ImageAsset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Unit" ADD COLUMN "photoId" UUID REFERENCES "ImageAsset"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+ ADD COLUMN "typeDetails" TEXT, ADD COLUMN "featureImages" JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE "Dealer" ADD COLUMN "photoId" UUID REFERENCES "ImageAsset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "User" ADD COLUMN "photoId" UUID REFERENCES "ImageAsset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Payment" ADD COLUMN "proofImageId" UUID REFERENCES "ImageAsset"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+ ADD COLUMN "methodDetails" TEXT;

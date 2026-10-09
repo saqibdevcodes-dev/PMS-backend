@@ -31,6 +31,7 @@ export function responseSchema(path: string, method: string, hasPagination: bool
       id: str,
       name: str,
       email: str,
+      accountType: { type: 'string', enum: ['STAFF', 'CUSTOMER'] },
       projects: array(object({ projectId: str })),
       permissions: array(str),
     });

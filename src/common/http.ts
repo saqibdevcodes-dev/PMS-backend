@@ -34,6 +34,7 @@ type RouteDoc = {
   path: string;
   permission?: string;
   public?: boolean;
+  audience?: 'customer' | 'authenticated';
   summary: string;
   body?: z.ZodType;
   query?: z.ZodType;
@@ -69,6 +70,16 @@ export function endpoint<
     const actor = options.public
       ? { id: '', sessionId: '', permissions: new Set<string>() }
       : await authenticate(req.headers.authorization?.replace(/^Bearer /, '') ?? '');
+    if (!options.public) {
+      if (options.audience === 'customer' && actor.accountType !== 'CUSTOMER')
+        throw new AppError(403, 'CUSTOMER_ACCOUNT_REQUIRED', 'Sign in with your customer account.');
+      if (actor.accountType === 'CUSTOMER' && !options.audience)
+        throw new AppError(
+          403,
+          'STAFF_ACCOUNT_REQUIRED',
+          'This operation is available to staff only.',
+        );
+    }
     if (options.permission && !actor.permissions.has(options.permission))
       throw new AppError(403, 'FORBIDDEN', 'You do not have permission for this operation.');
     const projectId = (req.params.projectId as string | undefined) ?? '';

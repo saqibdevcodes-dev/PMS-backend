@@ -1,3 +1,4 @@
+import { requireImage } from '../images/service.js';
 import type { Express } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
@@ -283,12 +284,14 @@ export function crmRoutes(app: Express) {
         .object({
           name: z.string().min(2).max(200),
           phone: z.string().min(6).max(30),
+          photoId: uuid,
           commissionPercent: money.refine((v) => decimal(v).lte(100)).default('0'),
         })
         .strict(),
     },
     async (ctx, b) =>
       transaction(async (tx) => {
+        await requireImage(tx, ctx, b.photoId, 'DEALER');
         const dealer = await tx.dealer.create({ data: { ...b, projectId: ctx.projectId } });
         await audit(tx, ctx, 'dealer.created', dealer.id);
         return dealer;

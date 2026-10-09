@@ -30,6 +30,7 @@ export async function transaction<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
 }
 const lockTables = [
   'User',
+  'Customer',
   'Session',
   'Unit',
   'Booking',

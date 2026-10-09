@@ -21,6 +21,8 @@
     "db:generate": "prisma generate && node scripts/model-metadata.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "admin:status": "tsx scripts/admin-account.ts status",
+    "admin:reset-password": "tsx scripts/admin-account.ts reset-password",
     "openapi": "tsx scripts/openapi.ts",
     "setup:env": "node scripts/setup-env.mjs",
     "pretest": "npm run build",
@@ -53,6 +55,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.4.3",
     "@eslint/js": "^10.0.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",

@@ -31,13 +31,15 @@ export const putObject = (key: string, body: Buffer, mime: string) =>
   storage.send(
     new PutObjectCommand({ Bucket: env.S3_BUCKET, Key: key, Body: body, ContentType: mime }),
   );
-export const signedDownload = (key: string) =>
+export const signedDownload = (key: string, name?: string, inline = false) =>
   getSignedUrl(
     signingStorage,
     new GetObjectCommand({
       Bucket: env.S3_BUCKET,
       Key: key,
-      ResponseContentDisposition: 'attachment',
+      ResponseContentDisposition:
+        (inline ? 'inline' : 'attachment') +
+        (name ? `; filename*=UTF-8''${encodeURIComponent(name).replace(/'/g, '%27')}` : ''),
     }),
     { expiresIn: 120 },
   );

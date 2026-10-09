@@ -1,3 +1,4 @@
+import { deliverInvitation } from '../modules/portal/invitations.js';
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
@@ -37,6 +38,11 @@ const worker = new Worker(
         `Your one-time reset token is ${decrypt(input.encryptedToken)}. Enter it in the password reset screen. It expires in 30 minutes.`,
         event.id,
       );
+    } else if (event.kind === 'customer-invitation') {
+      const input = z
+        .object({ invitationId: z.uuid(), encryptedToken: z.string() })
+        .parse(event.payload);
+      await deliverInvitation(input.invitationId, input.encryptedToken, event.id);
     } else if (event.kind === 'notification') {
       await deliverNotification(
         z.object({ notificationId: z.uuid() }).parse(event.payload).notificationId,

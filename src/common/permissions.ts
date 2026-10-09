@@ -10,6 +10,7 @@ export const permissions = [
   'customers.read',
   'customers.create',
   'customers.update',
+  'customers.portal.manage',
   'customers.view_sensitive',
   'crm.read',
   'crm.manage',

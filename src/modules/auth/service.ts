@@ -143,8 +143,11 @@ export async function authenticate(token: string): Promise<Actor> {
   return {
     id: session.userId,
     sessionId: session.id,
+    accountType: session.user.accountType,
     permissions: new Set(
-      session.user.roles.flatMap((r) => r.role.permissions.map((p) => p.permissionKey)),
+      session.user.accountType === 'CUSTOMER'
+        ? []
+        : session.user.roles.flatMap((r) => r.role.permissions.map((p) => p.permissionKey)),
     ),
   };
 }

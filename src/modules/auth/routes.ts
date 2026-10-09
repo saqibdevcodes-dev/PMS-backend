@@ -41,7 +41,12 @@ export function authRoutes(app: Express) {
     app,
     'post',
     '/auth/login',
-    { public: true, summary: 'Web login; refresh token is an HttpOnly cookie', body: loginBody },
+    {
+      public: true,
+      audience: 'authenticated',
+      summary: 'Web login; refresh token is an HttpOnly cookie',
+      body: loginBody,
+    },
     async (ctx, body, _q, req, res) => {
       browserOrigin(req);
       return webResult(await auth.login(body, 'web', ctx.requestId), res);
@@ -51,11 +56,15 @@ export function authRoutes(app: Express) {
     app,
     'post',
     '/auth/refresh',
-    { public: true, summary: 'Rotate web refresh cookie' },
+    { public: true, audience: 'authenticated', summary: 'Rotate web refresh cookie' },
     async (_ctx, _body, _q, req, res) => {
       browserOrigin(req);
-      const token = z.string().min(32).max(200).parse(req.cookies?.[cookieName]);
-      return webResult(await auth.refresh(token, false), res);
+      const token = tokenBody.shape.refreshToken.safeParse(req.cookies?.[cookieName]);
+      if (!token.success) {
+        res.clearCookie(cookieName, cookieOptions);
+        throw new AppError(401, 'SESSION_EXPIRED', 'Please sign in again.');
+      }
+      return webResult(await auth.refresh(token.data, false), res);
     },
   );
   endpoint(
@@ -64,6 +73,7 @@ export function authRoutes(app: Express) {
     '/auth/native/login',
     {
       public: true,
+      audience: 'authenticated',
       summary: 'Native login; store refresh token in OS secure storage',
       body: loginBody.extend({ platform: z.enum(['electron', 'android', 'ios']) }),
     },
@@ -73,7 +83,12 @@ export function authRoutes(app: Express) {
     app,
     'post',
     '/auth/native/refresh',
-    { public: true, summary: 'Rotate native refresh token', body: tokenBody },
+    {
+      public: true,
+      audience: 'authenticated',
+      summary: 'Rotate native refresh token',
+      body: tokenBody,
+    },
     async (_ctx, body) => auth.refresh(body.refreshToken, true),
   );
   for (const all of [false, true])
@@ -81,7 +96,7 @@ export function authRoutes(app: Express) {
       app,
       'post',
       all ? '/auth/logout-all' : '/auth/logout',
-      { summary: 'Revoke current or all sessions' },
+      { audience: 'authenticated', summary: 'Revoke current or all sessions' },
       async (ctx, _b, _q, _req, res) => {
         res.clearCookie(cookieName, cookieOptions);
         return auth.logout(ctx, all);
@@ -91,12 +106,18 @@ export function authRoutes(app: Express) {
     app,
     'get',
     '/auth/me',
-    { summary: 'Current user, permissions and project assignments' },
+    { audience: 'authenticated', summary: 'Current user, permissions and project assignments' },
     async (ctx) => {
       const user = found(
         await db.user.findUnique({
           where: { id: ctx.actor.id },
-          select: { id: true, name: true, email: true, projects: { select: { projectId: true } } },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            accountType: true,
+            projects: { select: { projectId: true } },
+          },
         }),
       );
       return { ...user, permissions: [...ctx.actor.permissions] };
@@ -107,6 +128,7 @@ export function authRoutes(app: Express) {
     'post',
     '/auth/change-password',
     {
+      audience: 'authenticated',
       summary: 'Change password and revoke all sessions',
       body: z.object({ currentPassword: z.string().max(128), newPassword: password }).strict(),
     },
@@ -118,6 +140,7 @@ export function authRoutes(app: Express) {
     '/auth/forgot-password',
     {
       public: true,
+      audience: 'authenticated',
       summary: 'Request one-time password recovery email',
       body: z.object({ email: z.email().toLowerCase() }).strict(),
     },
@@ -129,30 +152,36 @@ export function authRoutes(app: Express) {
     '/auth/reset-password',
     {
       public: true,
+      audience: 'authenticated',
       summary: 'Redeem a reset token and revoke sessions',
       body: z.object({ token: z.string().min(32).max(200), password }).strict(),
     },
     async (_ctx, body) => auth.resetPassword(body.token, body.password),
   );
-  endpoint(app, 'get', '/auth/sessions', { summary: 'List your device sessions' }, async (ctx) =>
-    db.session.findMany({
-      where: { userId: ctx.actor.id },
-      select: {
-        id: true,
-        platform: true,
-        deviceId: true,
-        createdAt: true,
-        lastActivity: true,
-        expiresAt: true,
-        revokedAt: true,
-      },
-    }),
+  endpoint(
+    app,
+    'get',
+    '/auth/sessions',
+    { audience: 'authenticated', summary: 'List your device sessions' },
+    async (ctx) =>
+      db.session.findMany({
+        where: { userId: ctx.actor.id },
+        select: {
+          id: true,
+          platform: true,
+          deviceId: true,
+          createdAt: true,
+          lastActivity: true,
+          expiresAt: true,
+          revokedAt: true,
+        },
+      }),
   );
   endpoint(
     app,
     'delete',
     '/auth/sessions/:id',
-    { summary: 'Revoke one of your device sessions' },
+    { audience: 'authenticated', summary: 'Revoke one of your device sessions' },
     async (ctx, _b, _q, req) => {
       await db.session.updateMany({
         where: { id: req.params.id as string, userId: ctx.actor.id },
@@ -166,6 +195,7 @@ export function authRoutes(app: Express) {
     'post',
     '/devices',
     {
+      audience: 'authenticated',
       summary: 'Register authenticated push installation',
       body: z
         .object({
@@ -189,7 +219,7 @@ export function authRoutes(app: Express) {
     app,
     'delete',
     '/devices/:id',
-    { summary: 'Revoke push installation' },
+    { audience: 'authenticated', summary: 'Revoke push installation' },
     async (ctx, _b, _q, req) => {
       await db.device.deleteMany({
         where: { id: uuid.parse(req.params.id), userId: ctx.actor.id },

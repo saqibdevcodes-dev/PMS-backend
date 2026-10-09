@@ -4,6 +4,20 @@
       "name": "User",
       "fields": [
         {
+          "name": "photoId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "photo",
+          "type": "ImageAsset",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
           "name": "id",
           "type": "String",
           "kind": "scalar",
@@ -29,6 +43,20 @@
           "type": "String",
           "kind": "scalar",
           "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "accountType",
+          "type": "AccountTypeScope",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "portalCustomers",
+          "type": "Customer",
+          "kind": "object",
+          "isList": true,
           "isRequired": true
         },
         {
@@ -481,6 +509,20 @@
       "name": "Project",
       "fields": [
         {
+          "name": "photoId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "photo",
+          "type": "ImageAsset",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
           "name": "id",
           "type": "String",
           "kind": "scalar",
@@ -715,6 +757,34 @@
       "name": "Unit",
       "fields": [
         {
+          "name": "photoId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "photo",
+          "type": "ImageAsset",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "typeDetails",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "featureImages",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
           "name": "id",
           "type": "String",
           "kind": "scalar",
@@ -942,6 +1012,41 @@
       "name": "Customer",
       "fields": [
         {
+          "name": "photoId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "photo",
+          "type": "ImageAsset",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "portalUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "portalUser",
+          "type": "User",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "portalInvitations",
+          "type": "CustomerInvitation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
           "name": "payments",
           "type": "Payment",
           "kind": "object",
@@ -1107,6 +1212,81 @@
           "type": "Document",
           "kind": "object",
           "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "CustomerInvitation",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "hash",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "usedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "revokedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "customer",
+          "type": "Customer",
+          "kind": "object",
+          "isList": false,
           "isRequired": true
         }
       ]
@@ -2010,6 +2190,27 @@
       "name": "Payment",
       "fields": [
         {
+          "name": "proofImageId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "proofImage",
+          "type": "ImageAsset",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "methodDetails",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
           "name": "payerId",
           "type": "String",
           "kind": "scalar",
@@ -2424,6 +2625,20 @@
     {
       "name": "Dealer",
       "fields": [
+        {
+          "name": "photoId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "photo",
+          "type": "ImageAsset",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
         {
           "name": "id",
           "type": "String",
@@ -3745,6 +3960,13 @@
       "name": "Document",
       "fields": [
         {
+          "name": "portalVisible",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
           "name": "id",
           "type": "String",
           "kind": "scalar",
@@ -4282,6 +4504,116 @@
           "isRequired": true
         }
       ]
+    },
+    {
+      "name": "ImageAsset",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "uploadedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "purpose",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "key",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "mime",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "size",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "users",
+          "type": "User",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "projects",
+          "type": "Project",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "units",
+          "type": "Unit",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "dealers",
+          "type": "Dealer",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "customers",
+          "type": "Customer",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "payments",
+          "type": "Payment",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
     }
   ],
   "enums": [
@@ -4433,6 +4765,17 @@
         },
         {
           "name": "FAILED"
+        }
+      ]
+    },
+    {
+      "name": "AccountTypeScope",
+      "values": [
+        {
+          "name": "STAFF"
+        },
+        {
+          "name": "CUSTOMER"
         }
       ]
     }

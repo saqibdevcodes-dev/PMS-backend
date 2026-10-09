@@ -95,6 +95,7 @@ async function approve(approvalId: string) {
   );
 }
 async function payment(bookingId: string, amount: string, method = 'CASH') {
+  const proofImageId = method === 'CASH' ? undefined : await recordImage('PAYMENT');
   return data<{ id: string }>(
     await auth(api.post(root() + '/payments'))
       .set('Idempotency-Key', randomUUID())
@@ -102,11 +103,25 @@ async function payment(bookingId: string, amount: string, method = 'CASH') {
         bookingId,
         amount,
         method,
+        proofImageId,
         paidAt: new Date().toISOString(),
         receivingAccountId: cashId,
       }),
     201,
   );
+}
+async function recordImage(purpose: 'PAYMENT' | 'DEALER') {
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1cAAAAASUVORK5CYII=',
+    'base64',
+  );
+  return data<{ id: string }>(
+    await auth(api.post('/api/v1/images'))
+      .field('purpose', purpose)
+      .field('projectId', projectId)
+      .attach('file', png, 'photo.png'),
+    201,
+  ).id;
 }
 async function clear(paymentId: string) {
   return data<{
@@ -667,6 +682,7 @@ describe('ownership, accounting and reporting', () => {
   });
   it('prevents duplicate dealer settlement', async () => {
     const dealer = await post<{ id: string }>(root() + '/dealers', {
+      photoId: await recordImage('DEALER'),
       name: 'Test dealer',
       phone: '03005555555',
       commissionPercent: '5',
@@ -848,15 +864,15 @@ describe('private storage, exports and API contracts', () => {
     expect(new Set([...first.items, ...second.items].map((item) => item.id)).size).toBe(105);
   });
   it('checks actual upload type and prevents cross-project document downloads', async () => {
-    const bad = await auth(api.post(root() + '/documents')).attach(
-      'file',
-      Buffer.from('Not a PDF'),
-      'fake.pdf',
-    );
+    const bad = await auth(api.post(root() + '/documents'))
+      .field('name', 'Invalid document')
+      .attach('file', Buffer.from('Not a PDF'), 'fake.pdf');
     expect(bad.status).toBe(422);
     const pdf = await pdfBuffer('Test document', 'Integration test content');
     const uploaded = data<{ id: string }>(
-      await auth(api.post(root() + '/documents')).attach('file', pdf, 'test.pdf'),
+      await auth(api.post(root() + '/documents'))
+        .field('name', 'Test document')
+        .attach('file', pdf, 'test.pdf'),
       201,
     );
     const download = data<{ url: string }>(

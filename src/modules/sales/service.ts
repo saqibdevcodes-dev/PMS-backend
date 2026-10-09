@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DateTime } from 'luxon';
+import { requireImage } from '../images/service.js';
 import { Prisma } from '@prisma/client';
 import { db, transaction, lock, type Tx } from '../../database/client.js';
 import type { Context } from '../../common/context.js';
@@ -260,6 +261,8 @@ export async function createPayment(
     method: string;
     paidAt: string;
     transactionReference?: string;
+    proofImageId?: string;
+    methodDetails?: string;
     receivingAccountId: string;
   },
   key: string,
@@ -289,6 +292,19 @@ export async function createPayment(
         'Payment date cannot be in the future.',
         422,
       );
+      requireState(
+        input.method === 'CASH' || input.proofImageId,
+        'PAYMENT_PROOF_REQUIRED',
+        'Upload a payment proof image for non-cash payments.',
+        422,
+      );
+      requireState(
+        input.method !== 'OTHER' || input.methodDetails?.trim(),
+        'PAYMENT_METHOD_DETAILS_REQUIRED',
+        'Describe how this payment was made.',
+        422,
+      );
+      await requireImage(tx, ctx, input.proofImageId, 'PAYMENT');
       const payment = await tx.payment.create({
         data: {
           ...input,

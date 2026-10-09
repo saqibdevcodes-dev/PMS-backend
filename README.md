@@ -2,6 +2,10 @@
 
 A centralized TypeScript and Express REST API for web, Electron, and Capacitor applications. PostgreSQL stores business records; Redis and BullMQ handle throttling, caching and background delivery. Documents and reports use private S3-compatible storage.
 
+Customer accounts now have a separate portal with invitations, ownership-scoped records, shared documents and statements. See the [customer portal rollout guide](docs/customer-portal.md) and the [security finding discovered during validation](docs/security-review-2026-10-04.md) before deployment.
+
+Photo uploads, payment proof and custom document names require the new [image-backed forms migration and API contracts](docs/form-images.md).
+
 ## Local setup
 
 Use Node.js 24 LTS and Docker Desktop with Linux containers. Node.js 22.12 or newer is also supported for local development.
@@ -26,6 +30,8 @@ The password must contain at least 12 characters, upper and lower case letters, 
 ```powershell
 npm run worker
 ```
+
+If the seed reports an existing administrator but login fails, see [administrator login recovery](docs/admin-recovery.md). `npm run admin:status` checks the configured database and account; `npm run admin:reset-password` explicitly applies `ADMIN_PASSWORD` to an existing active Super Admin and revokes its sessions. Run these commands in the same backend environment and database as the API being used.
 
 The API listens on `http://localhost:4000`. Health checks are `/health/live` and `/health/ready`. The API contract is `/api/v1/openapi.json`; its checked-in copy is [docs/openapi.json](docs/openapi.json). Development email is visible at `http://localhost:8025`. Private storage uses port 9002 and its administrative console uses port 9003. Database and Redis ports are 5434 and 6381; they bind to loopback only.
 
@@ -65,7 +71,7 @@ npm run openapi
 npm audit
 ```
 
-`npm run test:unit` needs no PostgreSQL, Redis, storage service or `.env` file. It covers exact financial arithmetic, authenticated encryption, token generation and the generated API contract.
+`npm run test:unit` needs no external PostgreSQL, Redis or storage service, or `.env` file. It covers exact financial arithmetic, authenticated encryption, token generation, the generated API contract and customer portal access controls. Portal tests apply the actual migrations and run Prisma queries against embedded PostgreSQL, with email and storage mocked.
 
 `npm test` also runs integration and background-worker tests. These create and reset an isolated `pms_test` PostgreSQL database. They never truncate the application database. An optional `TEST_DATABASE_URL` must name a database ending in `_test`. The test database account must be able to create that database (or it must already exist), apply migrations and truncate its test tables. PostgreSQL, Redis and S3-compatible services must be running. Tests cover simultaneous reservations, token replay, project isolation, payments, advance allocation, reversals, approvals, ownership, refunds, possession, journal constraints, pagination and private exports. Worker tests launch and stop a separate compiled worker using the test queue.
 

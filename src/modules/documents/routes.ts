@@ -53,7 +53,20 @@ export function documentRoutes(app: Express) {
       permission: 'documents.manage',
       summary: 'Upload validated PDF, JPEG or PNG to private storage; 10 MiB maximum',
       multipart: true,
-      body: z.object({ customerId: uuid.optional(), bookingId: uuid.optional() }).strict(),
+      body: z
+        .object({
+          name: z
+            .string()
+            .trim()
+            .min(1)
+            .max(180)
+            // Reject control characters and path separators in download names.
+            // eslint-disable-next-line no-control-regex
+            .regex(/^[^\\/\x00-\x1f]+$/),
+          customerId: uuid.optional(),
+          bookingId: uuid.optional(),
+        })
+        .strict(),
       status: 201,
     },
     async (ctx, b, _q, req) => {
@@ -119,7 +132,7 @@ export function documentRoutes(app: Express) {
             ...b,
             projectId: ctx.projectId,
             key,
-            name: path.basename(file.originalname).slice(0, 200),
+            name: b.name.toLowerCase().endsWith(extension) ? b.name : b.name + extension,
             mime: detected.mime,
             size: file.size,
             sha256: createHash('sha256').update(file.buffer).digest('hex'),
@@ -167,7 +180,7 @@ export function documentRoutes(app: Express) {
             403,
           );
         await audit(tx, ctx, 'document.downloaded', document.id);
-        return { url: await signedDownload(document.key), expiresIn: 120 };
+        return { url: await signedDownload(document.key, document.name), expiresIn: 120 };
       }),
   );
   endpoint(

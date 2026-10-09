@@ -67,6 +67,16 @@ export async function businessEvent(event: { id: string; payload: Prisma.JsonVal
       }
     }
     const customer = await eventCustomer(tx, input.kind, input.entityId);
+    if (customer) {
+      await tx.notification.create({
+        data: {
+          customerId: customer.id,
+          title: input.kind,
+          body: 'Your property account has an update. Open your customer portal to view it.',
+          channel: 'IN_APP',
+        },
+      });
+    }
     if (customer?.communicationConsent) {
       const channels: { channel: string; recipient: string }[] = [];
       if (customer.email) channels.push({ channel: 'EMAIL', recipient: customer.email });

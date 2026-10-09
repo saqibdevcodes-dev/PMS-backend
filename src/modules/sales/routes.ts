@@ -281,6 +281,8 @@ export function salesRoutes(app: Express) {
           method: z.enum(['CASH', 'BANK_TRANSFER', 'CHEQUE', 'PAY_ORDER', 'ONLINE', 'OTHER']),
           paidAt: z.iso.datetime(),
           transactionReference: z.string().max(200).optional(),
+          proofImageId: uuid.optional(),
+          methodDetails: z.string().trim().min(2).max(200).optional(),
           receivingAccountId: uuid,
         })
         .strict(),

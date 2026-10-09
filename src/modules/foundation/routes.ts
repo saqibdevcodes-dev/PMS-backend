@@ -5,11 +5,12 @@ import { DateTime } from 'luxon';
 import { db, transaction, lock } from '../../database/client.js';
 import { endpoint, pageQuery, pagination, paged, uuid, password, id } from '../../common/http.js';
 import { positiveMoney, money, decimal } from '../../common/money.js';
-import { found, requireState } from '../../common/errors.js';
+import { AppError, found, requireState } from '../../common/errors.js';
 import { audit, reference } from '../../common/operations.js';
 import { permissions } from '../../common/permissions.js';
 import { identityHash, encrypt, decrypt } from '../../common/security.js';
 import { passwordHash } from '../auth/service.js';
+import { requireImage, requireUnitImages } from '../images/service.js';
 import { defaultAccounts } from '../finance/service.js';
 import { scopedUnit, unitState } from '../inventory/service.js';
 import { consume, requestApproval } from '../approvals/service.js';
@@ -22,6 +23,7 @@ const projectBody = z
       .max(20)
       .regex(/^[A-Z0-9-]+$/),
     name: z.string().min(2).max(200),
+    photoId: uuid.optional(),
     currency: z
       .string()
       .regex(/^[A-Z]{3}$/)
@@ -39,25 +41,40 @@ const projectBody = z
 const unitBody = z
   .object({
     number: z.string().min(1).max(100),
-    type: z.enum(['RESIDENTIAL_PLOT', 'COMMERCIAL_PLOT', 'APARTMENT', 'SHOP', 'OFFICE']),
+    type: z.enum(['RESIDENTIAL_PLOT', 'COMMERCIAL_PLOT', 'APARTMENT', 'SHOP', 'OFFICE', 'OTHER']),
+    typeDetails: z.string().trim().min(2).max(100).optional(),
+    photoId: uuid.optional(),
+    featureImages: z
+      .array(z.object({ feature: z.string().min(1).max(100), imageId: uuid }).strict())
+      .max(30)
+      .default([]),
     phase: z.string().max(100).optional(),
     block: z.string().max(100).optional(),
     tower: z.string().max(100).optional(),
     sector: z.string().max(100).optional(),
     floor: z.string().max(100).optional(),
     size: positiveMoney,
-    measurementUnit: z.string().min(1).max(30),
+    measurementUnit: z.enum(['marla', 'kanal', 'sq ft', 'sq yd', 'sq m', 'acre', 'hectare']),
     features: z.array(z.string().max(100)).max(30).default([]),
     price: positiveMoney,
     charges: money.default('0'),
   })
-  .strict();
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.type === 'OTHER' && !v.typeDetails)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['typeDetails'],
+        message: 'Describe the property type.',
+      });
+  });
 export const customerBody = z
   .object({
     name: z.string().min(2).max(200),
     phone: z.string().min(6).max(30),
     email: z.email().optional(),
     address: z.string().max(1000).optional(),
+    photoId: uuid.optional(),
     identity: z
       .string()
       .min(5)
@@ -66,6 +83,16 @@ export const customerBody = z
     communicationConsent: z.boolean().default(false),
   })
   .strict();
+const customerCreateBody = customerBody
+  .extend({ password: password.optional() })
+  .superRefine((v, ctx) => {
+    if (v.password && !v.email)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['email'],
+        message: 'A customer email is required to create portal access.',
+      });
+  });
 const publicCustomer = {
   id: true,
   projectId: true,
@@ -74,6 +101,7 @@ const publicCustomer = {
   phone: true,
   email: true,
   address: true,
+  photoId: true,
   identityLast4: true,
   communicationConsent: true,
   createdAt: true,
@@ -108,6 +136,7 @@ export function foundationRoutes(app: Express) {
     },
     async (ctx, body) =>
       transaction(async (tx) => {
+        await requireImage(tx, ctx, body.photoId, 'PROJECT');
         const project = await tx.project.create({ data: body });
         await tx.userProjectAccess.create({
           data: { userId: ctx.actor.id, projectId: project.id },
@@ -124,10 +153,14 @@ export function foundationRoutes(app: Express) {
     {
       permission: 'projects.update',
       summary: 'Update project business rules',
-      body: projectBody.omit({ code: true }).partial(),
+      body: projectBody
+        .omit({ code: true })
+        .partial()
+        .extend({ photoId: uuid.nullable().optional() }),
     },
     async (ctx, body) =>
       transaction(async (tx) => {
+        await requireImage(tx, ctx, body.photoId, 'PROJECT');
         const project = await tx.project.update({ where: { id: ctx.projectId }, data: body });
         await audit(tx, ctx, 'project.updated', project.id, body);
         return project;
@@ -146,6 +179,7 @@ export function foundationRoutes(app: Express) {
             name: true,
             email: true,
             active: true,
+            photoId: true,
             roles: { include: { role: true } },
             projects: true,
           },
@@ -170,6 +204,7 @@ export function foundationRoutes(app: Express) {
           name: z.string().min(2).max(200),
           email: z.email().toLowerCase(),
           password,
+          photoId: uuid,
           roleIds: z.array(uuid).max(20),
           projectIds: z.array(uuid).max(100),
         })
@@ -184,11 +219,13 @@ export function foundationRoutes(app: Express) {
       );
       const hashed = await passwordHash(b.password);
       return transaction(async (tx) => {
+        await requireImage(tx, ctx, b.photoId, 'USER');
         const user = await tx.user.create({
           data: {
             name: b.name,
             email: b.email,
             passwordHash: hashed,
+            photoId: b.photoId,
             roles: { create: b.roleIds.map((roleId) => ({ roleId })) },
             projects: { create: b.projectIds.map((projectId) => ({ projectId })) },
           },
@@ -378,6 +415,7 @@ export function foundationRoutes(app: Express) {
     },
     async (ctx, b) =>
       transaction(async (tx) => {
+        await requireUnitImages(tx, ctx, b);
         const unit = await tx.unit.create({ data: { ...b, projectId: ctx.projectId } });
         await unitState(tx, ctx, unit.id, 'AVAILABLE', 'Inventory created');
         return unit;
@@ -395,6 +433,7 @@ export function foundationRoutes(app: Express) {
     async (ctx, b) =>
       transaction(async (tx) => {
         for (const u of b.units) {
+          await requireUnitImages(tx, ctx, u);
           const unit = await tx.unit.create({ data: { ...u, projectId: ctx.projectId } });
           await unitState(tx, ctx, unit.id, 'AVAILABLE', 'Bulk import');
         }
@@ -514,16 +553,55 @@ export function foundationRoutes(app: Express) {
     root + '/customers',
     {
       permission: 'customers.create',
-      summary: 'Create customer with encrypted identity and duplicate detection',
-      body: customerBody,
+      summary:
+        'Create customer with an optional photo and portal password; portal permission required for a password',
+      body: customerCreateBody,
       status: 201,
     },
-    async (ctx, b) =>
-      transaction(async (tx) => {
-        const { identity, ...fields } = b;
+    async (ctx, b) => {
+      if (b.password)
+        requireState(
+          ctx.actor.permissions.has('customers.portal.manage'),
+          'FORBIDDEN',
+          'Customer portal management permission is required to set a password.',
+          403,
+        );
+      const { identity, password: portalPassword, ...fields } = b;
+      const email = fields.email?.trim().toLowerCase();
+      const nextHash = portalPassword ? await passwordHash(portalPassword) : undefined;
+      return transaction(async (tx) => {
+        await requireImage(tx, ctx, fields.photoId, 'CUSTOMER');
+        let portalUserId: string | undefined;
+        if (nextHash) {
+          const emailUnavailable = () =>
+            new AppError(
+              409,
+              'EMAIL_UNAVAILABLE',
+              'This email already has an account. Use a separate email or invite the customer to link their existing account.',
+            );
+          if (await tx.user.findUnique({ where: { email: email! } })) throw emailUnavailable();
+          try {
+            const user = await tx.user.create({
+              data: {
+                name: fields.name,
+                email: email!,
+                passwordHash: nextHash,
+                accountType: 'CUSTOMER',
+              },
+            });
+            portalUserId = user.id;
+          } catch (error) {
+            // A concurrent account creation must never replace or attach to that account.
+            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')
+              throw emailUnavailable();
+            throw error;
+          }
+        }
         const customer = await tx.customer.create({
           data: {
             ...fields,
+            email,
+            portalUserId,
             projectId: ctx.projectId,
             reference: await reference(tx, 'CUS'),
             identityEncrypted: encrypt(identity),
@@ -533,8 +611,10 @@ export function foundationRoutes(app: Express) {
           select: publicCustomer,
         });
         await audit(tx, ctx, 'customer.created', customer.id);
+        if (portalUserId) await audit(tx, ctx, 'customer.portal_account_created', customer.id);
         return customer;
-      }),
+      });
+    },
   );
   endpoint(
     app,
@@ -623,11 +703,15 @@ export function foundationRoutes(app: Express) {
     {
       permission: 'customers.update',
       summary: 'Update non-identity customer contact details',
-      body: customerBody.omit({ identity: true }).partial(),
+      body: customerBody
+        .omit({ identity: true })
+        .extend({ photoId: uuid.nullable().optional() })
+        .partial(),
     },
     async (ctx, b, _q, req) =>
       transaction(async (tx) => {
         found(await tx.customer.findFirst({ where: { id: id(req), projectId: ctx.projectId } }));
+        await requireImage(tx, ctx, b.photoId, 'CUSTOMER');
         const result = await tx.customer.update({
           where: { id: id(req) },
           data: b,
