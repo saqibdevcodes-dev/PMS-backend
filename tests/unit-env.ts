@@ -12,9 +12,11 @@ Object.assign(process.env, {
   TRUSTED_ORIGINS: 'http://localhost:3000',
   PUBLIC_WEB_URL: 'http://localhost:3000',
   COOKIE_SECURE: 'false',
-  S3_ENDPOINT: 'http://127.0.0.1:1',
-  S3_REGION: 'us-east-1',
-  S3_BUCKET: 'unit-tests',
-  S3_ACCESS_KEY: 'unused-unit-test',
-  S3_SECRET_KEY: 'unused-unit-test-secret',
+  STORAGE_DRIVER: 'local',
+  UPLOAD_DIR: '.runtime/unit-uploads',
+  PUBLIC_API_URL: 'http://localhost:4000',
 });
+// Local storage must work without any object-store configuration.
+for (const name of Object.keys(process.env)) {
+  if (name.startsWith('S3_')) delete process.env[name];
+}

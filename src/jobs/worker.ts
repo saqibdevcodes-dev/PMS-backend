@@ -10,7 +10,7 @@ import { decrypt } from '../common/security.js';
 import { generateArtifact } from './artifacts.js';
 import { deliverNotification, sendEmail } from '../integrations/notifications.js';
 import { expireReservations } from '../modules/sales/service.js';
-import { ensureStorage } from '../integrations/storage.js';
+import { ensureStorage, storage } from '../integrations/storage.js';
 import { redis } from '../integrations/redis.js';
 const logger = pino();
 const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
@@ -105,6 +105,7 @@ async function shutdown() {
   await connection.quit();
   await redis.quit();
   await db.$disconnect();
+  storage.destroy();
   process.exit(0);
 }
 process.on('SIGTERM', () => void shutdown());

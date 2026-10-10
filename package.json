@@ -23,6 +23,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "admin:status": "tsx scripts/admin-account.ts status",
     "admin:reset-password": "tsx scripts/admin-account.ts reset-password",
+    "storage:import-s3": "node dist/scripts/import-storage.js",
     "openapi": "tsx scripts/openapi.ts",
     "setup:env": "node scripts/setup-env.mjs",
     "pretest": "npm run build",

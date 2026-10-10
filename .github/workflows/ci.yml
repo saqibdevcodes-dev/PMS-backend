@@ -22,9 +22,12 @@ jobs:
       - run: npm run format:check
       - run: npm run test:unit
       - run: npm test
+      - run: npm run test:integration
+        env:
+          STORAGE_DRIVER: s3
       - run: npm run build
       - run: npm run openapi
       - run: git diff --exit-code docs/openapi.json
       - run: npm audit --audit-level=moderate
       - if: always()
-        run: docker compose down -v
+        run: docker compose --profile s3 down -v

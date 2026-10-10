@@ -11,6 +11,7 @@ import { permissions } from '../src/common/permissions.js';
 import { expireReservations } from '../src/modules/sales/service.js';
 import { pdfBuffer, generateArtifact } from '../src/jobs/artifacts.js';
 import { buildOpenApi } from '../src/docs/openapi.js';
+import { env } from '../src/config/env.js';
 const app = createApp();
 const api = request(app);
 const pass = 'TestOnly-Strong-Password-192!';
@@ -27,6 +28,23 @@ let tokenA: string,
   cashId: string;
 let unitSequence = 0;
 const root = () => `/api/v1/projects/${projectId}`;
+async function downloadFile(url: string) {
+  if (env.STORAGE_DRIVER === 's3') {
+    const response = await fetch(url);
+    return { status: response.status, bytes: Buffer.from(await response.arrayBuffer()) };
+  }
+  const parsed = new URL(url);
+  const response = await api
+    .get(parsed.pathname + parsed.search)
+    .buffer(true)
+    .parse((res, done) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => done(null, Buffer.concat(chunks)));
+      res.on('error', done);
+    });
+  return { status: response.status, bytes: response.body as Buffer };
+}
 function auth(req: request.Test, token = tokenA) {
   return req.set('Authorization', `Bearer ${token}`);
 }
@@ -878,13 +896,16 @@ describe('private storage, exports and API contracts', () => {
     const download = data<{ url: string }>(
       await auth(api.get(root() + `/documents/${uploaded.id}/download`)),
     );
-    expect(download.url).toContain('X-Amz-Expires=120');
+    expect(download.url).toContain(
+      env.STORAGE_DRIVER === 's3' ? 'X-Amz-Expires=120' : '/api/v1/files?token=',
+    );
     expect(
       (await auth(api.get(`/api/v1/projects/${otherProjectId}/documents/${uploaded.id}/download`)))
         .status,
     ).toBe(404);
-    const response = await fetch(download.url);
+    const response = await downloadFile(download.url);
     expect(response.status).toBe(200);
+    expect(response.bytes).toEqual(pdf);
   });
   it('generates real XLSX and PDF report artifacts with private download URLs', async () => {
     for (const format of ['xlsx', 'pdf']) {
@@ -898,8 +919,9 @@ describe('private storage, exports and API contracts', () => {
       const download = data<{ url: string }>(
         await auth(api.get(root() + `/jobs/${job.id}/download`)),
       );
-      const response = await fetch(download.url);
-      const bytes = Buffer.from(await response.arrayBuffer());
+      const response = await downloadFile(download.url);
+      expect(response.status).toBe(200);
+      const bytes = response.bytes;
       expect(bytes.subarray(0, format === 'pdf' ? 4 : 2).toString()).toBe(
         format === 'pdf' ? '%PDF' : 'PK',
       );

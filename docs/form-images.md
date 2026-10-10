@@ -13,7 +13,7 @@ Request changes:
 - Payments: `proofImageId` required unless the method is CASH; `methodDetails` required for OTHER. Validation runs in the idempotent transaction, preventing duplicate payments on retry.
 - Document upload: required `name` for display and download. The file's validated extension is appended if absent; names cannot include paths or control characters. Signed downloads include the stored display name.
 
-Regenerate API metadata with `npm run openapi`, followed by `npm run generate:api` in FE when changing these contracts. The image and document endpoints depend on the existing private S3-compatible storage configuration; optional malware scanning uses the existing scanner setting. Uploads abandoned before a record is saved remain private and can be handled by an operator retention/cleanup policy.
+Regenerate API metadata with `npm run openapi`, followed by `npm run generate:api` in FE when changing these contracts. The image and document endpoints use private [local file storage](local-storage.md) by default; S3-compatible storage remains optional. Optional malware scanning uses the existing scanner setting. Uploads abandoned before a record is saved remain private and can be handled by an operator retention/cleanup policy.
 
 `tests/form-images.test.ts` checks authentication, roles, project scope, signature/size validation, customer photo creation/replacement/removal, portal password provisioning and rollback, Other details, required payment proof, payment retry behavior and document names using in-memory PostgreSQL. The full infrastructure integration fixtures also include the new required fields.
 

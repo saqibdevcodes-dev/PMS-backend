@@ -5,6 +5,7 @@ dist/
 !.env.example
 coverage/
 .runtime/
+uploads/
 *.log
 branch_structure.json
 temp_auto_push.bat

@@ -10,6 +10,7 @@ export default defineConfig({
       'tests/admin-recovery.test.ts',
       'tests/portal.test.ts',
       'tests/form-images.test.ts',
+      'tests/local-storage.test.ts',
     ],
     testTimeout: 20000,
     setupFiles: ['tests/unit-env.ts'],

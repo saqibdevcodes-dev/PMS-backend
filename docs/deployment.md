@@ -4,13 +4,15 @@
 
 Build from the committed lockfile with `npm ci`. The Docker image targets Node.js 24 LTS. Run API and worker as separate processes from the same release. Apply `prisma migrate deploy` as a release step before starting them; do not run interactive migrations against production.
 
-Use managed PostgreSQL, authenticated/TLS Redis and private S3 storage in production. The Compose stack is a loopback-bound development environment. Its generated passwords are local credentials. Supply production secrets through your deployment secret manager, including JWT key ring, identity encryption/search keys, database URL, object-store credentials and provider credentials. Keep `.env` and database backups out of source control.
+Use PostgreSQL, authenticated/TLS Redis and private persistent file storage in production. The Compose stack supplies local services with loopback-bound host ports; its generated passwords are development credentials. Supply production secrets through your deployment secret manager, including JWT key ring, identity encryption/search keys, database URL and provider credentials. Object-store credentials are needed only for the optional S3 driver. Keep `.env`, uploaded files and database backups out of source control.
 
 Set `NODE_ENV=production`, `COOKIE_SECURE=true`, HTTPS `PUBLIC_WEB_URL`, an explicit `TRUSTED_ORIGINS` list and the exact number of trusted reverse-proxy hops. The application rejects insecure production API requests. Do not trust arbitrary forwarded headers. Enforce TLS at the load balancer and configure PostgreSQL certificate validation in its connection settings.
 
 JWT key rotation uses `JWT_KEYS`, a JSON object keyed by signing key ID. Change `JWT_ACTIVE_KID` to the new key while retaining old verification keys for at least the maximum access-token lifetime. Refresh tokens are independent opaque values. Changing the identity search key requires rebuilding search hashes from decrypted identities; encryption key rotation requires a controlled re-encryption migration. Back up keys separately and restrict access.
 
-Provision the S3 bucket before starting production. Keep public access disabled, encrypt storage at rest and use a lifecycle policy for exported objects. Configure `S3_PUBLIC_ENDPOINT` to a hostname accessible to clients; signed URLs must use the same bucket and credentials as the internal endpoint. Access links expire in 120 seconds. Periodically remove uploaded objects that have no document metadata after an interrupted upload.
+`STORAGE_DRIVER=local` is the default. Set HTTPS `PUBLIC_API_URL` to the backend origin and persist the backend's `uploads/` directory with permissions for the API and worker. Compose shares a bind mount between both processes. See [local file storage](local-storage.md) for VPS commands and importing existing MinIO files. Files are served through signed API links, not a public static directory. Access links expire in 120 seconds.
+
+Alternatively, set `STORAGE_DRIVER=s3` and provision the private bucket before starting production. Keep public access disabled and configure `S3_PUBLIC_ENDPOINT` to a hostname accessible to clients. Signed URLs must use the same bucket and credentials as the internal endpoint. Start the optional Compose `storage` service before the API and worker when using MinIO. For either driver, encrypt backups and periodically review files with no corresponding metadata after interrupted uploads.
 
 ## Providers and policies
 
@@ -20,7 +22,7 @@ Assign business-specific approval thresholds, dealer percentages, project rules 
 
 ## Monitoring and recovery
 
-`/health/live` checks process liveness. `/health/ready` checks PostgreSQL, Redis and the private storage bucket. `/api/v1/metrics` exposes authenticated Prometheus metrics to a user with `users.manage`; keep the scrape credential in a monitoring secret. Structured logs include request IDs and route paths without query strings, request bodies or authentication tokens. Monitor HTTP error rates, queue failure events, old undispatched/unprocessed outbox rows and failed background job records.
+`/health/live` checks process liveness. `/health/ready` checks PostgreSQL, Redis and the configured storage directory or private bucket. `/api/v1/metrics` exposes authenticated Prometheus metrics to a user with `users.manage`; keep the scrape credential in a monitoring secret. Structured logs include request IDs and route paths without query strings, request bodies or authentication tokens. Monitor HTTP error rates, queue failure events, old undispatched/unprocessed outbox rows and failed background job records.
 
 Workers retry delivery up to eight times with exponential backoff. Keep completed BullMQ event IDs while corresponding outbox rows are retained. A crash after queue insertion and before outbox acknowledgement safely retries the same job ID. Archive old successful queue/outbox records together using an operational retention job; never delete pending or failed records. Retain audit and financial history according to the organization's documented retention policy.
 
@@ -28,7 +30,7 @@ Use a least-privilege runtime PostgreSQL role without DDL, TRUNCATE, migration o
 
 ## Backup and restore
 
-Schedule encrypted PostgreSQL backups and point-in-time recovery/WAL archiving. Back up private objects, encryption keys and configuration. A backup is not verified until a restore is tested in isolation. Before restoring production, stop API and workers, restore the database and corresponding object-store snapshot, validate migrations and financial trial balance, then restart workers and API. Existing Redis work may reference old state; replay authoritative pending PostgreSQL outbox events into a fresh queue when recovering from a database snapshot.
+Schedule encrypted PostgreSQL backups and point-in-time recovery/WAL archiving. Back up the host `uploads/` directory (or S3 objects), encryption keys and configuration. A backup is not verified until a restore is tested in isolation. Before restoring production, stop API and workers, restore the database and corresponding file/bucket snapshot, validate migrations and financial trial balance, then restart workers and API. Existing Redis work may reference old state; replay authoritative pending PostgreSQL outbox events into a fresh queue when recovering from a database snapshot.
 
 Example development backup commands are `pg_dump --format=custom --file=pms.dump <DATABASE_URL>` and `pg_restore --clean --if-exists --dbname=<RESTORE_DATABASE_URL> pms.dump`. Provide connection secrets through protected environment variables or service files instead of shell history. Use a separate restore target for drills.
 

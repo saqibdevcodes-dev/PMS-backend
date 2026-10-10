@@ -1,6 +1,10 @@
 import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
+import { resolve } from 'node:path';
 process.env.NODE_ENV = 'test';
+process.env.STORAGE_DRIVER ??= 'local';
+if (process.env.STORAGE_DRIVER === 'local')
+  process.env.UPLOAD_DIR = resolve('.runtime/integration-uploads');
 const url = new URL(process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL!);
 if (!process.env.TEST_DATABASE_URL) url.pathname = '/pms_test';
 if (!url.pathname.endsWith('_test'))

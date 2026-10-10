@@ -1,6 +1,6 @@
 # PMS backend architecture and implementation design
 
-The service is a modular monolith. One versioned Express API serves web, Electron, and Capacitor clients. PostgreSQL is the authority for identity, inventory, ownership and money. Redis supplies distributed throttling, scoped caching and BullMQ delivery. Private S3 objects contain documents and exports.
+The service is a modular monolith. One versioned Express API serves web, Electron, and Capacitor clients. PostgreSQL is the authority for identity, inventory, ownership and money. Redis supplies distributed throttling, scoped caching and BullMQ delivery. Private files in the backend's persistent `uploads/` directory contain images, documents and exports by default; S3-compatible storage is optional. Both drivers issue short-lived download links after access checks.
 
 HTTP adapters validate Zod contracts and authorize permissions. Domain services perform transitions inside serializable transactions. Prisma handles data access. Transactions retry serialization conflicts; immutable journals, unique active inventory claims and a transactional outbox protect business consistency.
 

@@ -8,11 +8,10 @@ import { Registry, Counter, collectDefaultMetrics } from '@prometheus-io/client'
 import { randomUUID } from 'node:crypto';
 import { ZodError, z } from 'zod';
 import { Prisma } from '@prisma/client';
-import { HeadBucketCommand } from '@aws-sdk/client-s3';
 import { env } from './config/env.js';
 import { db } from './database/client.js';
 import { redis, throttle } from './integrations/redis.js';
-import { storage } from './integrations/storage.js';
+import { checkStorage, storageRoutes } from './integrations/storage.js';
 import { AppError } from './common/errors.js';
 import { endpoint, pageQuery, id, paged, pagination } from './common/http.js';
 import { portalRoutes } from './modules/portal/routes.js';
@@ -97,11 +96,7 @@ export function createApp() {
   app.get('/health/live', (_req, res) => res.json({ status: 'ok' }));
   app.get('/health/ready', async (_req, res) => {
     try {
-      await Promise.all([
-        db.$queryRaw`SELECT 1`,
-        redis.ping(),
-        storage.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET })),
-      ]);
+      await Promise.all([db.$queryRaw`SELECT 1`, redis.ping(), checkStorage()]);
       res.json({ status: 'ready' });
     } catch {
       res.status(503).json({ status: 'unavailable' });
@@ -150,6 +145,7 @@ export function createApp() {
       res.type(registry.contentType).send(await registry.metrics());
     },
   );
+  storageRoutes(app);
   authRoutes(app);
   portalRoutes(app);
   imageRoutes(app);
