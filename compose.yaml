@@ -34,7 +34,11 @@ services:
     ports: ['127.0.0.1:9002:9000', '127.0.0.1:9003:9001']
     volumes: ['storage-data:/data']
     healthcheck:
-      test: ['CMD-SHELL', 'mc alias set health http://127.0.0.1:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null && mc ready health']
+      test:
+        [
+          'CMD-SHELL',
+          'mc alias set health http://127.0.0.1:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null && mc ready health',
+        ]
       interval: 10s
       timeout: 5s
       retries: 12

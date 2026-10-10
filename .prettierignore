@@ -3,3 +3,8 @@ dist
 package-lock.json
 docs/openapi.json
 prisma/migrations
+
+# Installed assistant skills are maintained by their upstream packages.
+.agents/skills/
+.claude/skills/
+.windsurf/skills/
