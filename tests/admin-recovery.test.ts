@@ -95,6 +95,10 @@ describe('operator administrator recovery', () => {
     });
     expect(audit.entityId).toBe(adminId);
     expect(audit.data).toEqual({ source: 'operator-cli' });
+    const emailNotification = await db.notification.findFirstOrThrow({
+      where: { userId: adminId, channel: 'EMAIL', title: 'Your password has changed' },
+    });
+    expect(emailNotification.body).not.toContain(nextPassword);
   });
   it('rejects missing accounts and weak passwords', async () => {
     await expect(

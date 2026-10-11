@@ -49,7 +49,13 @@ export function authRoutes(app: Express) {
     },
     async (ctx, body, _q, req, res) => {
       browserOrigin(req);
-      return webResult(await auth.login(body, 'web', ctx.requestId), res);
+      return webResult(
+        await auth.login(body, 'web', ctx.requestId, {
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        }),
+        res,
+      );
     },
   );
   endpoint(
@@ -77,7 +83,11 @@ export function authRoutes(app: Express) {
       summary: 'Native login; store refresh token in OS secure storage',
       body: loginBody.extend({ platform: z.enum(['electron', 'android', 'ios']) }),
     },
-    async (ctx, body) => auth.login(body, body.platform, ctx.requestId),
+    async (ctx, body, _q, req) =>
+      auth.login(body, body.platform, ctx.requestId, {
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      }),
   );
   endpoint(
     app,

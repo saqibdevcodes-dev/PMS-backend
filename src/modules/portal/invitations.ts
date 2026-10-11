@@ -8,6 +8,7 @@ import { passwordHash } from '../auth/service.js';
 import { throttle } from '../../integrations/redis.js';
 import { env } from '../../config/env.js';
 import { sendEmail } from '../../integrations/notifications.js';
+import { emailUser, welcomeUser, webLink } from '../../common/notifications.js';
 
 export async function inviteCustomer(ctx: Context, customerId: string) {
   requireState(
@@ -127,6 +128,7 @@ export async function acceptInvitation(token: string, password: string) {
           accountType: 'CUSTOMER',
         },
       });
+      await welcomeUser(tx, user.id);
     }
     await tx.customer.update({
       where: { id: invitation.customerId },
@@ -140,6 +142,12 @@ export async function acceptInvitation(token: string, password: string) {
       where: { customerId: invitation.customerId, usedAt: null },
       data: { revokedAt: new Date() },
     });
+    await emailUser(
+      tx,
+      user.id,
+      'Your customer portal access is active',
+      `Your customer profile has been linked to your account. Sign in to view your property information: ${webLink('/portal/login')}`,
+    );
     await audit(
       tx,
       {
@@ -171,6 +179,12 @@ export async function revokeCustomer(ctx: Context, customerId: string) {
         where: { userId: customer.portalUserId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      await emailUser(
+        tx,
+        customer.portalUserId,
+        'Your customer portal access has changed',
+        'The property office removed portal access for one of your customer profiles and signed out your sessions. Contact the office if you need assistance.',
+      );
     }
     await audit(tx, ctx, 'customer.portal_revoked', customerId);
     return { revoked: true };

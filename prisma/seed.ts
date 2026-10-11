@@ -4,6 +4,7 @@ import { permissions, roleMatrix } from '../src/common/permissions.js';
 import { password } from '../src/common/http.js';
 import { passwordHash } from '../src/modules/auth/service.js';
 import { redis } from '../src/integrations/redis.js';
+import { welcomeUser } from '../src/common/notifications.js';
 export async function seedRoles() {
   return transaction(async (tx) => {
     for (const key of permissions)
@@ -23,13 +24,17 @@ if (process.env.ADMIN_EMAIL || process.env.ADMIN_PASSWORD) {
   const pass = password.parse(process.env.ADMIN_PASSWORD);
   if (!(await db.user.findUnique({ where: { email } }))) {
     const role = await db.role.findUniqueOrThrow({ where: { name: 'Super Admin' } });
-    await db.user.create({
-      data: {
-        email,
-        name: 'Administrator',
-        passwordHash: await passwordHash(pass),
-        roles: { create: { roleId: role.id } },
-      },
+    const nextHash = await passwordHash(pass);
+    await transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          name: 'Administrator',
+          passwordHash: nextHash,
+          roles: { create: { roleId: role.id } },
+        },
+      });
+      await welcomeUser(tx, user.id);
     });
     console.log('Administrator created from environment credentials.');
   } else console.log('Administrator already exists; password unchanged.');

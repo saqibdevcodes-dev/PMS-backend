@@ -348,9 +348,13 @@ describe('private record images and guided form contracts', () => {
     );
     const staffPhoto = await upload('USER');
     expect((await post('/users').send({ ...staff, photoId: staffPhoto })).status).toBe(201);
-    expect((await db.user.findUniqueOrThrow({ where: { email: staff.email } })).photoId).toBe(
-      staffPhoto,
-    );
+    const createdUser = await db.user.findUniqueOrThrow({ where: { email: staff.email } });
+    expect(
+      await db.notification.count({
+        where: { userId: createdUser.id, channel: 'EMAIL', title: 'Welcome to Etihad Real Estate' },
+      }),
+    ).toBe(1);
+    expect(createdUser.photoId).toBe(staffPhoto);
   });
   it('saves customer photos, returns previews and supports replacing and removing them', async () => {
     const photoId = await upload('CUSTOMER', projectId);
@@ -445,6 +449,11 @@ describe('private record images and guided form contracts', () => {
     const user = await db.user.findUniqueOrThrow({ where: { email } });
     expect(customer.portalUserId).toBe(user.id);
     expect(user.accountType).toBe('CUSTOMER');
+    expect(
+      await db.notification.count({
+        where: { userId: user.id, channel: 'EMAIL', title: 'Welcome to Etihad Real Estate' },
+      }),
+    ).toBe(1);
     expect(user.passwordHash).not.toBe(pass);
     expect(await argon2.verify(user.passwordHash, pass)).toBe(true);
     expect(await db.userRole.count({ where: { userId: user.id } })).toBe(0);
@@ -456,6 +465,59 @@ describe('private record images and guided form contracts', () => {
     const audit = await db.auditLog.findMany({ where: { entityId: customer.id } });
     expect(audit.map((entry) => entry.action)).toContain('customer.portal_account_created');
     expect(JSON.stringify(audit)).not.toMatch(/Customer-Password-123|passwordHash|argon2/);
+  });
+  it('emails lead creation, changed assignees, follow-ups and recovery assignments to the assignee', async () => {
+    const path = `/projects/${projectId}`;
+    const created = await post(path + '/leads').send({
+      name: 'Assigned lead',
+      phone: '03001234567',
+      source: 'Website',
+      assignedTo: staffId,
+    });
+    expect(created.status, created.text).toBe(200);
+    const leadId = created.body.data.id;
+    const patch = (assignedTo: string) =>
+      request(app)
+        .patch('/api/v1' + path + '/leads/' + leadId)
+        .set('Authorization', 'Bearer staff')
+        .send({ assignedTo });
+    expect((await patch(staffId)).status).toBe(200);
+    expect(
+      await db.notification.count({
+        where: { userId: staffId, title: 'New lead assigned to you', channel: 'EMAIL' },
+      }),
+    ).toBe(1);
+    expect(await db.notification.count({ where: { title: 'Lead reassigned to you' } })).toBe(0);
+    // Cross-project assignees cannot receive either the assignment or an email.
+    expect((await patch(otherId)).status).toBe(404);
+    await db.userProjectAccess.create({ data: { userId: otherId, projectId } });
+    expect((await patch(otherId)).status).toBe(200);
+    expect(
+      await db.notification.count({
+        where: { userId: otherId, title: 'Lead reassigned to you', channel: 'EMAIL' },
+      }),
+    ).toBe(1);
+    expect(
+      (
+        await post(path + '/leads/' + leadId + '/activities').send({
+          kind: 'FOLLOW_UP',
+          notes: 'Call the lead',
+          scheduledAt: new Date(Date.now() + 86400000).toISOString(),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      await db.notification.count({
+        where: { userId: otherId, title: 'New scheduled lead activity', channel: 'EMAIL' },
+      }),
+    ).toBe(1);
+    const recovery = await post(path + '/recovery-cases').send({ bookingId, assignedTo: staffId });
+    expect(recovery.status, recovery.text).toBe(200);
+    expect(
+      await db.notification.count({
+        where: { userId: staffId, title: 'New recovery case assigned to you', channel: 'EMAIL' },
+      }),
+    ).toBe(1);
   });
   it('requires a valid password, email and portal permission; passwords cannot be patched', async () => {
     const path = `/projects/${projectId}/customers`;
@@ -480,6 +542,60 @@ describe('private record images and guided form contracts', () => {
           .send({ password })
       ).status,
     ).toBe(422);
+  });
+  it('sends a transactional welcome for customer profile registration without portal access or optional communication consent', async () => {
+    const email = 'profile-welcome@example.invalid';
+    const response = await post(`/projects/${projectId}/customers`).send({
+      name: 'New customer profile',
+      phone: '03001234567',
+      identity: randomUUID(),
+      email,
+    });
+    expect(response.status, response.text).toBe(201);
+    expect(response.body.data.communicationConsent).toBe(false);
+    const notification = await db.notification.findFirstOrThrow({
+      where: { recipient: email, title: 'Welcome to Etihad Real Estate', channel: 'EMAIL' },
+    });
+    expect(notification.customerId).toBe(response.body.data.id);
+    expect(notification.body).toContain('request customer portal access');
+    expect(await db.user.count({ where: { email } })).toBe(0);
+    expect(
+      await db.outbox.count({
+        where: {
+          kind: 'customer-welcome',
+          payload: { path: ['notificationId'], equals: notification.id },
+        },
+      }),
+    ).toBe(1);
+  });
+  it('emails account status, access and administrator session changes to the affected user', async () => {
+    const user = await db.user.create({
+      data: { name: 'Managed staff', email: 'managed@example.invalid', passwordHash: 'test-only' },
+    });
+    const patch = (active: boolean) =>
+      request(app)
+        .patch('/api/v1/users/' + user.id)
+        .set('Authorization', 'Bearer staff')
+        .send({ active });
+    expect((await patch(false)).status).toBe(200);
+    expect((await patch(false)).status).toBe(200);
+    expect((await patch(true)).status).toBe(200);
+    expect(
+      (await post('/users/' + user.id + '/access').send({ roleIds: [], projectIds: [projectId] }))
+        .status,
+    ).toBe(200);
+    expect((await post('/users/' + user.id + '/revoke-sessions').send({})).status).toBe(200);
+    const notifications = await db.notification.findMany({
+      where: { userId: user.id, channel: 'EMAIL' },
+    });
+    expect(notifications.map((n) => n.title).sort()).toEqual(
+      [
+        'Your account has been disabled',
+        'Your account has been enabled',
+        'Your account access has changed',
+        'Your sessions have been signed out',
+      ].sort(),
+    );
   });
   it('never overwrites or links existing accounts, and rolls back portal creation if the customer fails', async () => {
     const path = `/projects/${projectId}/customers`;

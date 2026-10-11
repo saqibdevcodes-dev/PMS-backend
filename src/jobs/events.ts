@@ -5,13 +5,28 @@ import { db, transaction, type Tx } from '../database/client.js';
 import { env } from '../config/env.js';
 import { outbox } from '../common/operations.js';
 import { sum } from '../common/money.js';
+import { webLink } from '../common/notifications.js';
 async function eventCustomer(tx: Tx, kind: string, entityId: string) {
   if (kind === 'Booking confirmed')
     return (await tx.booking.findUnique({ where: { id: entityId }, include: { customer: true } }))
       ?.customer;
-  if (kind === 'Payment receipt')
+  if (kind === 'Payment receipt' || kind === 'Payment reversed')
     return (await tx.payment.findUnique({ where: { id: entityId }, include: { payer: true } }))
       ?.payer;
+  if (kind === 'Booking cancelled')
+    return (
+      await tx.cancellation.findUnique({
+        where: { id: entityId },
+        include: { booking: { include: { customer: true } } },
+      })
+    )?.booking.customer;
+  if (kind === 'Refund paid')
+    return (
+      await tx.refund.findUnique({
+        where: { id: entityId },
+        include: { cancellation: { include: { booking: { include: { customer: true } } } } },
+      })
+    )?.cancellation.booking.customer;
   if (kind === 'NDC issued')
     return (
       await tx.ndc.findUnique({
@@ -46,20 +61,20 @@ export async function businessEvent(event: { id: string; payload: Prisma.JsonVal
     const current = await tx.outbox.findUniqueOrThrow({ where: { id: event.id } });
     if (current.processedAt) return;
     const users = await tx.userProjectAccess.findMany({
-      where: { projectId: input.projectId, user: { active: true } },
+      where: { projectId: input.projectId, user: { active: true, accountType: 'STAFF' } },
       include: { user: { select: { devices: { select: { pushToken: true } } } } },
     });
     for (const user of users) {
       const channels =
         env.PUSH_WEBHOOK_URL && user.user.devices.some((d) => d.pushToken)
-          ? ['IN_APP', 'PUSH']
-          : ['IN_APP'];
+          ? ['IN_APP', 'EMAIL', 'PUSH']
+          : ['IN_APP', 'EMAIL'];
       for (const channel of channels) {
         const n = await tx.notification.create({
           data: {
             userId: user.userId,
             title: input.kind,
-            body: 'A project record was updated. Open PMS to review it.',
+            body: `A project record was updated: ${input.kind}.\nSign in to review it: ${webLink()}`,
             channel,
           },
         });
@@ -87,7 +102,7 @@ export async function businessEvent(event: { id: string; payload: Prisma.JsonVal
           data: {
             customerId: customer.id,
             title: input.kind,
-            body: 'Your property account has an update. Please contact the project office or sign in to view it.',
+            body: `Hello ${customer.name},\n\nYour property account has an update: ${input.kind}.\nPlease contact the project office or sign in to view it: ${webLink('/portal/login')}\n\nEtihad Real Estate`,
             ...channel,
           },
         });

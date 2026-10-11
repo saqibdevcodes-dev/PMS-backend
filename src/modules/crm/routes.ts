@@ -2,13 +2,21 @@ import { requireImage } from '../images/service.js';
 import type { Express } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import { db, transaction } from '../../database/client.js';
+import { db, transaction, lock, type Tx } from '../../database/client.js';
 import { endpoint, pageQuery, pagination, paged, uuid, id } from '../../common/http.js';
 import { money, positiveMoney, decimal } from '../../common/money.js';
 import { found, requireState } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
 import { scopedBooking } from '../sales/service.js';
+import { assignmentEmail } from '../../common/notifications.js';
 const root = '/projects/:projectId';
+async function requireAssignee(tx: Tx, userId: string, projectId: string) {
+  found(
+    await tx.userProjectAccess.findFirst({
+      where: { userId, projectId, user: { active: true, accountType: 'STAFF' } },
+    }),
+  );
+}
 export function crmRoutes(app: Express) {
   const leadBody = z
     .object({
@@ -30,12 +38,7 @@ export function crmRoutes(app: Express) {
     },
     async (ctx, b) =>
       transaction(async (tx) => {
-        if (b.assignedTo)
-          found(
-            await tx.userProjectAccess.findUnique({
-              where: { userId_projectId: { userId: b.assignedTo, projectId: ctx.projectId } },
-            }),
-          );
+        if (b.assignedTo) await requireAssignee(tx, b.assignedTo, ctx.projectId);
         if (b.dealerId)
           found(
             await tx.dealer.findFirst({
@@ -44,6 +47,14 @@ export function crmRoutes(app: Express) {
           );
         const lead = await tx.lead.create({ data: { ...b, projectId: ctx.projectId } });
         await audit(tx, ctx, 'lead.created', lead.id);
+        if (lead.assignedTo)
+          await assignmentEmail(
+            tx,
+            lead.assignedTo,
+            ctx.projectId,
+            'New lead assigned to you',
+            `You have been assigned a lead: ${lead.name}.`,
+          );
         return lead;
       }),
   );
@@ -101,6 +112,7 @@ export function crmRoutes(app: Express) {
     },
     async (ctx, b, _q, req) =>
       transaction(async (tx) => {
+        await lock(tx, 'Lead', id(req));
         const lead = found(
           await tx.lead.findFirst({ where: { id: id(req), projectId: ctx.projectId } }),
         );
@@ -109,13 +121,17 @@ export function crmRoutes(app: Express) {
           'LEAD_CONVERTED',
           'Converted leads retain their customer linkage.',
         );
-        if (b.assignedTo)
-          found(
-            await tx.userProjectAccess.findUnique({
-              where: { userId_projectId: { userId: b.assignedTo, projectId: ctx.projectId } },
-            }),
+        if (b.assignedTo) await requireAssignee(tx, b.assignedTo, ctx.projectId);
+        const updated = await tx.lead.update({ where: { id: lead.id }, data: b });
+        if (b.assignedTo && b.assignedTo !== lead.assignedTo)
+          await assignmentEmail(
+            tx,
+            b.assignedTo,
+            ctx.projectId,
+            'Lead reassigned to you',
+            `You have been assigned a lead: ${lead.name}.`,
           );
-        return tx.lead.update({ where: { id: lead.id }, data: b });
+        return updated;
       }),
   );
   endpoint(
@@ -134,17 +150,31 @@ export function crmRoutes(app: Express) {
         })
         .strict(),
     },
-    async (ctx, b, _q, req) => {
-      found(await db.lead.findFirst({ where: { id: id(req), projectId: ctx.projectId } }));
-      return db.leadActivity.create({
-        data: {
-          ...b,
-          scheduledAt: b.scheduledAt ? new Date(b.scheduledAt) : undefined,
-          leadId: id(req),
-          createdBy: ctx.actor.id,
-        },
-      });
-    },
+    async (ctx, b, _q, req) =>
+      transaction(async (tx) => {
+        const lead = found(
+          await tx.lead.findFirst({ where: { id: id(req), projectId: ctx.projectId } }),
+        );
+        const activity = await tx.leadActivity.create({
+          data: {
+            ...b,
+            scheduledAt: b.scheduledAt ? new Date(b.scheduledAt) : undefined,
+            leadId: id(req),
+            createdBy: ctx.actor.id,
+          },
+        });
+        if (b.scheduledAt && lead.assignedTo) {
+          await requireAssignee(tx, lead.assignedTo, ctx.projectId);
+          await assignmentEmail(
+            tx,
+            lead.assignedTo,
+            ctx.projectId,
+            'New scheduled lead activity',
+            `A ${b.kind.toLowerCase().replaceAll('_', ' ')} has been scheduled for your lead ${lead.name}.\nScheduled time: ${new Date(b.scheduledAt).toISOString()} (UTC).`,
+          );
+        }
+        return activity;
+      }),
   );
   endpoint(
     app,
@@ -187,13 +217,17 @@ export function crmRoutes(app: Express) {
     },
     async (ctx, b) =>
       transaction(async (tx) => {
-        await scopedBooking(tx, ctx, b.bookingId);
-        found(
-          await tx.userProjectAccess.findUnique({
-            where: { userId_projectId: { userId: b.assignedTo, projectId: ctx.projectId } },
-          }),
+        const booking = await scopedBooking(tx, ctx, b.bookingId);
+        await requireAssignee(tx, b.assignedTo, ctx.projectId);
+        const recovery = await tx.recoveryCase.create({ data: b });
+        await assignmentEmail(
+          tx,
+          b.assignedTo,
+          ctx.projectId,
+          'New recovery case assigned to you',
+          `You have been assigned a recovery case for booking ${booking.reference}.`,
         );
-        return tx.recoveryCase.create({ data: b });
+        return recovery;
       }),
   );
   endpoint(

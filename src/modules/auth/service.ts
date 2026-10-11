@@ -7,6 +7,7 @@ import { hash, opaqueToken, encrypt } from '../../common/security.js';
 import { audit, outbox } from '../../common/operations.js';
 import type { Actor, Context } from '../../common/context.js';
 import { throttle } from '../../integrations/redis.js';
+import { emailUser, passwordChangedEmail, webLink } from '../../common/notifications.js';
 
 export const passwordHash = (password: string) =>
   argon2.hash(password, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
@@ -38,6 +39,7 @@ export async function login(
   input: { email: string; password: string; deviceId?: string },
   platform: string,
   requestId: string,
+  details: { ip?: string; userAgent?: string } = {},
 ) {
   if (!(await throttle(`login:${hash(input.email)}`, 15, 900)))
     throw new AppError(429, 'LOGIN_THROTTLED', 'Try again later.');
@@ -68,6 +70,12 @@ export async function login(
       },
       'auth.login',
       session.id,
+    );
+    await emailUser(
+      tx,
+      user.id,
+      'New sign-in to your account',
+      `Your account was signed in at ${session.createdAt.toISOString()} (UTC).\nPlatform: ${platform}${details.ip ? `\nIP address: ${details.ip}` : ''}${details.userAgent ? `\nBrowser or app: ${details.userAgent.slice(0, 500).replace(/[\r\n]/g, ' ')}` : ''}\n\nIf this was you, no action is needed. If you do not recognize this sign-in, reset your password and contact the property office: ${webLink('/forgot-password')}`,
     );
     return issue(tx, session);
   });
@@ -181,6 +189,7 @@ export async function changePassword(ctx: Context, oldPassword: string, newPassw
     await tx.user.update({ where: { id: user.id }, data: { passwordHash: nextHash } });
     await tx.session.updateMany({ where: { userId: user.id }, data: { revokedAt: new Date() } });
     await audit(tx, ctx, 'auth.password_changed', user.id);
+    await passwordChangedEmail(tx, user.id);
     return { changed: true };
   });
 }
@@ -227,6 +236,7 @@ export async function resetPassword(token: string, password: string) {
       where: { userId: reset.userId },
       data: { revokedAt: new Date() },
     });
+    await passwordChangedEmail(tx, reset.userId);
     return { changed: true };
   });
 }

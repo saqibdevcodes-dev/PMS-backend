@@ -15,6 +15,12 @@ Object.assign(process.env, {
   STORAGE_DRIVER: 'local',
   UPLOAD_DIR: '.runtime/unit-uploads',
   PUBLIC_API_URL: 'http://localhost:4000',
+  SMTP_HOST: '127.0.0.1',
+  SMTP_PORT: '1025',
+  SMTP_FROM: 'noreply@test.invalid',
+  SMTP_SECURE: 'false',
+  SMTP_USER: '',
+  SMTP_PASSWORD: '',
 });
 // Local storage must work without any object-store configuration.
 for (const name of Object.keys(process.env)) {

@@ -58,7 +58,7 @@ services:
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       UPLOAD_DIR: /app/uploads
       S3_ENDPOINT: http://storage:9000
-      SMTP_HOST: mail
+      SMTP_HOST: ${SMTP_DOCKER_HOST:-${SMTP_HOST:-mail}}
     ports: ['127.0.0.1:4000:4000']
     volumes: ['./uploads:/app/uploads']
     depends_on:
@@ -80,7 +80,7 @@ services:
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       UPLOAD_DIR: /app/uploads
       S3_ENDPOINT: http://storage:9000
-      SMTP_HOST: mail
+      SMTP_HOST: ${SMTP_DOCKER_HOST:-${SMTP_HOST:-mail}}
     volumes: ['./uploads:/app/uploads']
     depends_on:
       postgres: { condition: service_healthy }

@@ -8,14 +8,26 @@ export async function sendEmail(to: string, subject: string, text: string, messa
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: env.SMTP_SECURE,
+    requireTLS: Boolean(env.SMTP_USER) && !env.SMTP_SECURE,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
+    disableFileAccess: true,
+    disableUrlAccess: true,
     auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASSWORD } : undefined,
   });
+  const escapeHtml = (value: string) =>
+    value.replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+    );
   await transport.sendMail({
     from: env.SMTP_FROM,
     to,
     subject,
     text,
-    messageId: `<${messageId}@pms.local>`,
+    html: `<html><body style="margin:0;background:#f4f6fa;font-family:Arial,sans-serif;color:#182337"><div style="max-width:600px;margin:24px auto;padding:28px;background:white;border-radius:12px"><p style="color:#526585;font-weight:bold">ETIHAD REAL ESTATE</p><h1 style="font-size:22px">${escapeHtml(subject)}</h1><div style="font-size:15px;line-height:1.7;white-space:pre-wrap">${escapeHtml(text)}</div></div></body></html>`,
+    messageId: `<${messageId}@${new URL(env.PUBLIC_WEB_URL).hostname}>`,
   });
 }
 export async function webhook(channel: 'SMS' | 'PUSH', payload: unknown) {
@@ -37,7 +49,7 @@ export async function webhook(channel: 'SMS' | 'PUSH', payload: unknown) {
     503,
   );
 }
-export async function deliverNotification(id: string) {
+export async function deliverNotification(id: string, customerRegistration = false) {
   const notification = found(
     await db.notification.findUnique({
       where: { id },
@@ -49,7 +61,20 @@ export async function deliverNotification(id: string) {
     }),
   );
   if (notification.deliveries.some((d) => d.success)) return;
-  if (notification.customer && !notification.customer.communicationConsent) {
+  // Only the internal customer-welcome outbox event sets this policy. Property updates
+  // always use the default and recheck communication consent immediately before sending.
+  if (customerRegistration)
+    requireState(
+      notification.channel === 'EMAIL' && notification.customer,
+      'INVALID_NOTIFICATION',
+      'A customer registration email is required.',
+      400,
+    );
+  if (
+    notification.customer &&
+    !notification.customer.communicationConsent &&
+    !customerRegistration
+  ) {
     await db.notificationDelivery.create({
       data: { notificationId: id, success: false, error: 'Consent withdrawn; delivery skipped.' },
     });

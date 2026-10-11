@@ -1,10 +1,11 @@
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 import { z } from 'zod';
-import { db } from '../database/client.js';
+import { db, transaction, lock } from '../database/client.js';
 import { report, reportQuery, type ReportRow } from '../modules/reports/service.js';
 import { putObject } from '../integrations/storage.js';
 import { found, requireState } from '../common/errors.js';
+import { emailUser, webLink } from '../common/notifications.js';
 export function pdfBuffer(title: string, rows: ReportRow[] | string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 42, info: { Title: title } });
@@ -137,9 +138,22 @@ export async function generateArtifact(jobId: string) {
     }
     const key = `projects/${job.projectId}/exports/${job.id}.${extension}`;
     await putObject(key, body, mime);
-    await db.backgroundJob.update({
-      where: { id: job.id },
-      data: { status: 'COMPLETED', resultKey: key },
+    await transaction(async (tx) => {
+      await lock(tx, 'BackgroundJob', job.id);
+      if (
+        (await tx.backgroundJob.findUniqueOrThrow({ where: { id: job.id } })).status === 'COMPLETED'
+      )
+        return;
+      await tx.backgroundJob.update({
+        where: { id: job.id },
+        data: { status: 'COMPLETED', resultKey: key },
+      });
+      await emailUser(
+        tx,
+        job.createdBy,
+        job.kind === 'REPORT' ? 'Your report is ready' : 'Your document is ready',
+        `Your requested ${job.kind === 'REPORT' ? 'report' : 'document'} has been generated.\nJob reference: ${job.id}\n\nSign in to download it securely: ${webLink()}`,
+      );
     });
   } catch (error) {
     await db.backgroundJob.update({

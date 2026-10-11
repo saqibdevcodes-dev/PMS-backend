@@ -367,6 +367,11 @@ export async function completeCancellation(ctx: Context, id: string, approvalId:
     });
     await unitState(tx, ctx, booking.unitId, 'AVAILABLE', 'Booking cancelled');
     await audit(tx, ctx, 'cancellation.completed', id);
+    await outbox(tx, 'business-event', {
+      projectId: ctx.projectId,
+      kind: 'Booking cancelled',
+      entityId: id,
+    });
     return result;
   });
 }
@@ -456,6 +461,11 @@ export async function payRefund(
       data: { status: 'COMPLETED', paidAt: new Date(), paymentReference: input.paymentReference },
     });
     await audit(tx, ctx, 'refund.paid', id);
+    await outbox(tx, 'business-event', {
+      projectId: ctx.projectId,
+      kind: 'Refund paid',
+      entityId: id,
+    });
     return result;
   });
 }

@@ -467,6 +467,11 @@ export async function reversePayment(
       data: { status: 'REVERSED' },
     });
     await audit(tx, ctx, 'payment.reversed', payment.id, { reason });
+    await outbox(tx, 'business-event', {
+      projectId: ctx.projectId,
+      kind: 'Payment reversed',
+      entityId: payment.id,
+    });
     return result;
   });
 }

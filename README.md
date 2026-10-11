@@ -73,7 +73,7 @@ npm audit
 
 `npm run test:unit` needs no external PostgreSQL, Redis or storage service, or `.env` file. It covers exact financial arithmetic, authenticated encryption, token generation, the generated API contract, customer portal access controls and private local file downloads, including expiry, tampering and path isolation. Portal tests apply the actual migrations and run Prisma queries against embedded PostgreSQL, with email and storage mocked.
 
-`npm test` also runs integration and background-worker tests. These create and reset an isolated `pms_test` PostgreSQL database. They never truncate the application database. An optional `TEST_DATABASE_URL` must name a database ending in `_test`. The test database account must be able to create that database (or it must already exist), apply migrations and truncate its test tables. PostgreSQL and Redis must be running. Local storage tests use `.runtime/integration-uploads` rather than application uploads. Set `STORAGE_DRIVER=s3` and start MinIO for S3 integration coverage; CI checks both drivers. Tests cover simultaneous reservations, token replay, project isolation, payments, advance allocation, reversals, approvals, ownership, refunds, possession, journal constraints, pagination and private exports. Worker tests launch and stop a separate compiled worker using the test queue.
+`npm test` also runs integration and background-worker tests. These create and reset an isolated `pms_test` PostgreSQL database. They never truncate the application database. An optional `TEST_DATABASE_URL` must name a database ending in `_test`. The test database account must be able to create that database (or it must already exist), apply migrations and truncate its test tables. PostgreSQL, Redis and Mailpit must be running. Local storage tests use `.runtime/integration-uploads` rather than application uploads. Set `STORAGE_DRIVER=s3` and start MinIO for S3 integration coverage; CI checks both drivers. Tests cover simultaneous reservations, token replay, project isolation, payments, advance allocation, reversals, approvals, ownership, refunds, possession, journal constraints, pagination and private exports. Worker tests launch and stop a separate compiled worker using the test queue.
 
 ## Documentation
 
@@ -82,6 +82,7 @@ npm audit
 - [Business rules and reporting definitions](docs/business-rules.md)
 - [Deployment, recovery and operational configuration](docs/deployment.md)
 - [Local file storage and VPS deployment](docs/local-storage.md)
+- [Email notification events, SMTP configuration and deployment](docs/email-notifications.md)
 - [Latest verification results and remaining service checks](docs/verification.md)
 
 External SMS and push services use configurable authenticated HTTP adapters; email uses SMTP. Provider credentials are required for external delivery. The optional malware scanner uses an HTTP scan adapter. The backend reports provider failures and retries them; it does not fabricate delivery success.
@@ -90,3 +91,8 @@ docker compose -p pms-be --profile app build api worker &&
 docker compose -p pms-be --profile app stop api worker &&
 docker compose -p pms-be --profile app run --rm --no-deps api npm run db:migrate &&
 docker compose -p pms-be --profile app up -d --no-deps --force-recreate api worker
+
+docker exec \
+-e ADMIN_EMAIL='email' \
+-e ADMIN_PASSWORD='Password' \
+pms-be-api-1 node /app/dist/prisma/seed.js

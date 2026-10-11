@@ -4,6 +4,46 @@ import { audit, json } from '../../common/operations.js';
 import { canonical } from '../../common/security.js';
 import { found, requireState } from '../../common/errors.js';
 import type { Context } from '../../common/context.js';
+import { assignmentEmail, emailUser, webLink } from '../../common/notifications.js';
+
+async function notifyApprovers(
+  tx: Tx,
+  approval: {
+    id: string;
+    projectId: string;
+    requestedBy: string;
+    permissions: string[];
+    level: number;
+    operation: string;
+  },
+) {
+  const acted = await tx.approvalAction.findMany({
+    where: { approvalId: approval.id },
+    select: { actorId: true },
+  });
+  const users = await tx.user.findMany({
+    where: {
+      active: true,
+      accountType: 'STAFF',
+      id: { notIn: [approval.requestedBy, ...acted.map((a) => a.actorId)] },
+      projects: { some: { projectId: approval.projectId } },
+      roles: {
+        some: {
+          role: { permissions: { some: { permissionKey: approval.permissions[approval.level]! } } },
+        },
+      },
+    },
+    select: { id: true },
+  });
+  for (const user of users)
+    await assignmentEmail(
+      tx,
+      user.id,
+      approval.projectId,
+      'Approval requires your review',
+      `A ${approval.operation.toLowerCase().replaceAll('_', ' ')} request is waiting for approval at level ${approval.level + 1}.\nRequest reference: ${approval.id}`,
+    );
+}
 export const approvalPermissions = {
   DISCOUNT: 'discounts.approve',
   BOOKING: 'bookings.approve',
@@ -43,6 +83,7 @@ export async function requestApproval(
     },
   });
   await audit(tx, ctx, 'approval.requested', approval.id, { operation, entityId });
+  await notifyApprovers(tx, approval);
   return approval;
 }
 export async function decide(
@@ -94,6 +135,14 @@ export async function decide(
       data: { status, level: approval.level + 1 },
     });
     await audit(tx, ctx, 'approval.decided', id, { decision, level: approval.level });
+    if (status === 'PENDING') await notifyApprovers(tx, result);
+    else
+      await emailUser(
+        tx,
+        approval.requestedBy,
+        `Your request was ${status === 'APPROVED' ? 'approved' : 'rejected'}`,
+        `Your ${approval.operation.toLowerCase().replaceAll('_', ' ')} request was ${status.toLowerCase()}.\nRequest reference: ${approval.id}\n\nSign in to review the decision: ${webLink()}`,
+      );
     return result;
   });
 }

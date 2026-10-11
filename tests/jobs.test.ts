@@ -5,6 +5,7 @@ import { db, transaction } from '../src/database/client.js';
 import { outbox } from '../src/common/operations.js';
 import { ensureStorage, storage } from '../src/integrations/storage.js';
 import { redis } from '../src/integrations/redis.js';
+import { emailUser } from '../src/common/notifications.js';
 let worker: ChildProcess;
 let workerLogs = '';
 let userId: string;
@@ -135,4 +136,22 @@ it('delivers an in-app notification once and records the delivery attempt', asyn
       where: { notificationId: notification.id, success: true },
     }),
   ).toBe(1);
+});
+
+it('sends a queued email through the actual worker and local SMTP server', async () => {
+  const title = 'Email worker test ' + randomUUID();
+  const n = await transaction((tx) =>
+    emailUser(tx, userId, title, 'Local SMTP delivery verification.'),
+  );
+  await eventually(
+    async () =>
+      (await db.notificationDelivery.count({ where: { notificationId: n.id, success: true } })) ===
+      1,
+  );
+  const inbox = await fetch(
+    'http://127.0.0.1:8025/api/v1/search?query=' + encodeURIComponent(`subject:"${title}"`),
+  );
+  expect(inbox.ok).toBe(true);
+  const result = (await inbox.json()) as { messages: { Subject: string }[] };
+  expect(result.messages.some((m) => m.Subject === title)).toBe(true);
 });

@@ -31,6 +31,7 @@ export async function transaction<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
 const lockTables = [
   'User',
   'Customer',
+  'Lead',
   'Session',
   'Unit',
   'Booking',
@@ -43,6 +44,7 @@ const lockTables = [
   'Possession',
   'DealerCommission',
   'Project',
+  'BackgroundJob',
 ] as const;
 export async function lock(tx: Tx, table: (typeof lockTables)[number], id: string) {
   if (!lockTables.includes(table)) throw new Error('Invalid lock target');

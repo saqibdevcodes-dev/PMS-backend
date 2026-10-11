@@ -12,6 +12,7 @@ import { deliverNotification, sendEmail } from '../integrations/notifications.js
 import { expireReservations } from '../modules/sales/service.js';
 import { ensureStorage, storage } from '../integrations/storage.js';
 import { redis } from '../integrations/redis.js';
+import { webLink } from '../common/notifications.js';
 const logger = pino();
 const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
 export const queue = new Queue(env.NODE_ENV === 'test' ? 'pms-events-test' : 'pms-events', {
@@ -34,8 +35,8 @@ const worker = new Worker(
       const user = await db.user.findUniqueOrThrow({ where: { id: input.userId } });
       await sendEmail(
         user.email,
-        'Reset your PMS password',
-        `Your one-time reset token is ${decrypt(input.encryptedToken)}. Enter it in the password reset screen. It expires in 30 minutes.`,
+        'Reset your Etihad Real Estate password',
+        `Open the password reset screen: ${webLink('/reset-password')}\n\nYour one-time reset token is ${decrypt(input.encryptedToken)}. Paste it into the Recovery token field and choose a new password. It expires in 30 minutes.\n\nIf you did not request this, you can ignore this email. Your password has not changed.`,
         event.id,
       );
     } else if (event.kind === 'customer-invitation') {
@@ -43,9 +44,10 @@ const worker = new Worker(
         .object({ invitationId: z.uuid(), encryptedToken: z.string() })
         .parse(event.payload);
       await deliverInvitation(input.invitationId, input.encryptedToken, event.id);
-    } else if (event.kind === 'notification') {
+    } else if (event.kind === 'notification' || event.kind === 'customer-welcome') {
       await deliverNotification(
         z.object({ notificationId: z.uuid() }).parse(event.payload).notificationId,
+        event.kind === 'customer-welcome',
       );
     } else if (event.kind === 'business-event') {
       await businessEvent(event);

@@ -12,6 +12,7 @@ import {
 import { db, transaction } from '../../database/client.js';
 import { found, requireState } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
+import { customerUpdate } from '../../common/notifications.js';
 import { signedDownload } from '../../integrations/storage.js';
 import { ownedBookings, visibleDocuments } from './access.js';
 import { customerStatement } from './statement.js';
@@ -316,6 +317,30 @@ export function portalRoutes(app: Express) {
           );
         await tx.document.update({ where: { id: doc.id }, data: body });
         await audit(tx, ctx, 'document.portal_visibility_changed', doc.id, body);
+        if (body.portalVisible && !doc.portalVisible) {
+          const customers = await tx.customer.findMany({
+            where: {
+              projectId: ctx.projectId,
+              portalUser: { active: true, accountType: 'CUSTOMER' },
+              ...(doc.customerId
+                ? { id: doc.customerId }
+                : {
+                    OR: [
+                      { bookings: { some: { id: doc.bookingId! } } },
+                      { owners: { some: { bookingId: doc.bookingId!, validTo: null } } },
+                    ],
+                  }),
+            },
+          });
+          for (const customer of customers) {
+            if (
+              await tx.document.findFirst({
+                where: { id: doc.id, AND: [visibleDocuments(customer.portalUserId!)] },
+              })
+            )
+              await customerUpdate(tx, customer.id, 'New document available');
+          }
+        }
         return { updated: true };
       }),
   );

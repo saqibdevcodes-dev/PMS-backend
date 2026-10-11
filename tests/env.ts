@@ -17,3 +17,12 @@ process.env.IDENTITY_HASH_KEY ??= randomBytes(48).toString('hex');
 process.env.COOKIE_SECURE = 'false';
 process.env.TRUSTED_ORIGINS = 'http://localhost:3000,capacitor://localhost';
 process.env.PUBLIC_WEB_URL = 'http://localhost:3000';
+// Integration email delivery must only go to the local Mailpit inbox.
+Object.assign(process.env, {
+  SMTP_HOST: '127.0.0.1',
+  SMTP_PORT: '1025',
+  SMTP_FROM: 'noreply@test.invalid',
+  SMTP_SECURE: 'false',
+  SMTP_USER: '',
+  SMTP_PASSWORD: '',
+});

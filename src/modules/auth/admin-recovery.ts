@@ -6,6 +6,7 @@ import { password } from '../../common/http.js';
 import { requireState } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
 import { passwordHash } from './service.js';
+import { passwordChangedEmail } from '../../common/notifications.js';
 
 const emailSchema = z.email().trim().toLowerCase();
 
@@ -76,6 +77,7 @@ export async function recoverAdminPassword(email: string, nextPassword: string) 
       user.id,
       { source: 'operator-cli' },
     );
+    await passwordChangedEmail(tx, user.id);
     return { changed: true };
   });
 }

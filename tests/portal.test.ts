@@ -401,6 +401,39 @@ describe('customer portal with real Prisma queries and embedded PostgreSQL', () 
     const bytes = vi.mocked(putObject).mock.calls.at(-1)![1];
     expect(bytes.subarray(0, 4).toString()).toBe('%PDF');
   });
+  it('emails newly shared documents only to customers with access and communication consent', async () => {
+    await db.customer.update({ where: { id: customerA }, data: { communicationConsent: true } });
+    const doc = await db.document.create({
+      data: {
+        projectId,
+        bookingId: bookingA,
+        name: 'Shared contract.pdf',
+        key: 'newly-shared',
+        mime: 'application/pdf',
+        size: 42,
+        sha256: 'test-hash',
+        uploadedBy: staff,
+      },
+    });
+    const share = () =>
+      request(app)
+        .patch(`/api/v1/projects/${projectId}/documents/${doc.id}/portal-visibility`)
+        .set('Authorization', 'Bearer ' + staffToken)
+        .send({ portalVisible: true });
+    expect((await share()).status).toBe(200);
+    expect((await share()).status).toBe(200);
+    expect(
+      await db.notification.count({
+        where: { customerId: customerA, channel: 'EMAIL', title: 'New document available' },
+      }),
+    ).toBe(1);
+    expect(
+      await db.notification.count({
+        where: { customerId: customerB, channel: 'EMAIL', title: 'New document available' },
+      }),
+    ).toBe(0);
+    await db.customer.update({ where: { id: customerA }, data: { communicationConsent: false } });
+  });
   it('creates invitations without credentials or tokens in API responses and emails only valid invites', async () => {
     const c = await customer('new-customer@example.invalid');
     const result = await inviteCustomer(ctx(), c.id);
@@ -420,6 +453,21 @@ describe('customer portal with real Prisma queries and embedded PostgreSQL', () 
     );
     const token = decrypt(payload.encryptedToken);
     await acceptInvitation(token, pass);
+    const activated = await db.user.findUniqueOrThrow({ where: { email: c.email! } });
+    expect(
+      await db.notification.count({
+        where: { userId: activated.id, channel: 'EMAIL', title: 'Welcome to Etihad Real Estate' },
+      }),
+    ).toBe(1);
+    expect(
+      await db.notification.count({
+        where: {
+          userId: activated.id,
+          channel: 'EMAIL',
+          title: 'Your customer portal access is active',
+        },
+      }),
+    ).toBe(1);
     expect(
       (await db.customer.findUniqueOrThrow({ where: { id: c.id }, include: { portalUser: true } }))
         .portalUser?.accountType,
@@ -485,7 +533,9 @@ describe('customer portal with real Prisma queries and embedded PostgreSQL', () 
           .send({})
       ).status,
     ).toBe(404);
-    expect((await get('/portal/notifications')).body.data.items).toEqual([]);
+    expect(
+      (await get('/portal/notifications')).body.data.items.map((n: { id: string }) => n.id),
+    ).not.toContain(notice.id);
   });
   it('removes former-owner access after transfer while granting it to the new owner', async () => {
     await db.bookingOwner.updateMany({

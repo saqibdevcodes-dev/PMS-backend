@@ -6,7 +6,7 @@ import { db, transaction, lock } from '../../database/client.js';
 import { endpoint, pageQuery, pagination, paged, uuid, password, id } from '../../common/http.js';
 import { positiveMoney, money, decimal } from '../../common/money.js';
 import { AppError, found, requireState } from '../../common/errors.js';
-import { audit, reference } from '../../common/operations.js';
+import { audit, reference, outbox } from '../../common/operations.js';
 import { permissions } from '../../common/permissions.js';
 import { identityHash, encrypt, decrypt } from '../../common/security.js';
 import { passwordHash } from '../auth/service.js';
@@ -14,6 +14,7 @@ import { requireImage, requireUnitImages } from '../images/service.js';
 import { defaultAccounts } from '../finance/service.js';
 import { scopedUnit, unitState } from '../inventory/service.js';
 import { consume, requestApproval } from '../approvals/service.js';
+import { emailUser, welcomeUser, webLink } from '../../common/notifications.js';
 
 const projectBody = z
   .object({
@@ -232,6 +233,7 @@ export function foundationRoutes(app: Express) {
           select: { id: true, name: true, email: true, active: true },
         });
         await audit(tx, ctx, 'user.created', user.id);
+        await welcomeUser(tx, user.id);
         return user;
       });
     },
@@ -253,6 +255,7 @@ export function foundationRoutes(app: Express) {
           'SELF_DEACTIVATION',
           'You cannot deactivate your own account.',
         );
+        const previous = found(await tx.user.findUnique({ where: { id: id(req) } }));
         const user = await tx.user.update({
           where: { id: id(req) },
           data: b,
@@ -264,6 +267,15 @@ export function foundationRoutes(app: Express) {
             data: { revokedAt: new Date() },
           });
         await audit(tx, ctx, 'user.activation', user.id, b);
+        if (previous.active !== b.active)
+          await emailUser(
+            tx,
+            user.id,
+            b.active ? 'Your account has been enabled' : 'Your account has been disabled',
+            b.active
+              ? `The property office has enabled your account. Sign in: ${webLink(previous.accountType === 'CUSTOMER' ? '/portal/login' : '/login')}`
+              : 'The property office has disabled your account and signed out your sessions. Contact the office if you need assistance.',
+          );
         return user;
       }),
   );
@@ -298,6 +310,12 @@ export function foundationRoutes(app: Express) {
           data: { revokedAt: new Date() },
         });
         await audit(tx, ctx, 'user.sessions_revoked', id(req));
+        await emailUser(
+          tx,
+          id(req),
+          'Your sessions have been signed out',
+          'An administrator signed out all sessions for your account. Contact the property office if you did not expect this action.',
+        );
         return { revoked: true };
       }),
   );
@@ -338,6 +356,12 @@ export function foundationRoutes(app: Express) {
           skipDuplicates: true,
         });
         await audit(tx, ctx, 'user.access_changed', id(req), b);
+        await emailUser(
+          tx,
+          id(req),
+          'Your account access has changed',
+          `An administrator updated your roles or project access. Sign in to review your current access: ${webLink()}`,
+        );
         return { updated: true };
       }),
   );
@@ -611,7 +635,23 @@ export function foundationRoutes(app: Express) {
           select: publicCustomer,
         });
         await audit(tx, ctx, 'customer.created', customer.id);
-        if (portalUserId) await audit(tx, ctx, 'customer.portal_account_created', customer.id);
+        if (portalUserId) {
+          await audit(tx, ctx, 'customer.portal_account_created', customer.id);
+          await welcomeUser(tx, portalUserId);
+        } else if (customer.email) {
+          // A one-time registration confirmation is transactional, even without portal access.
+          // Keep it independent of the optional customer property-update consent.
+          const notification = await tx.notification.create({
+            data: {
+              customerId: customer.id,
+              recipient: customer.email,
+              channel: 'EMAIL',
+              title: 'Welcome to Etihad Real Estate',
+              body: `Hello ${customer.name},\n\nYour customer profile has been registered with Etihad Real Estate. Contact the property office for assistance or to request customer portal access.\n\nEtihad Real Estate`,
+            },
+          });
+          await outbox(tx, 'customer-welcome', { notificationId: notification.id });
+        }
         return customer;
       });
     },
