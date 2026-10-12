@@ -1,15 +1,11 @@
 import type { Express } from 'express';
-import { randomUUID } from 'node:crypto';
-import path from 'node:path';
-import multer from 'multer';
-import { fileTypeFromBuffer } from 'file-type';
 import { z } from 'zod';
 import { endpoint, uuid, id } from '../../common/http.js';
 import { db } from '../../database/client.js';
 import { authenticate } from '../auth/service.js';
 import { found, requireState } from '../../common/errors.js';
-import { putObject, signedDownload } from '../../integrations/storage.js';
-import { env } from '../../config/env.js';
+import { signedDownload } from '../../integrations/storage.js';
+import { imageUpload, uploadImage } from './upload.js';
 import { purposes, imageGrants, type ImagePurpose } from './service.js';
 
 export function imageRoutes(app: Express) {
@@ -26,10 +22,7 @@ export function imageRoutes(app: Express) {
       );
       next();
     },
-    multer({
-      storage: multer.memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 2, parts: 3 },
-    }).single('file'),
+    imageUpload,
   );
   endpoint(
     app,
@@ -63,49 +56,12 @@ export function imageRoutes(app: Express) {
             where: { userId_projectId: { userId: ctx.actor.id, projectId: body.projectId } },
           }),
         );
-      const file = found(req.file);
-      const detected = await fileTypeFromBuffer(file.buffer);
-      const allowed: Record<string, string[]> = {
-        'image/jpeg': ['.jpg', '.jpeg'],
-        'image/png': ['.png'],
-        'image/webp': ['.webp'],
-      };
-      requireState(
-        detected && allowed[detected.mime]?.includes(path.extname(file.originalname).toLowerCase()),
-        'INVALID_IMAGE',
-        'Choose a valid JPEG, PNG or WebP image up to 5 MiB.',
-        422,
+      const image = await uploadImage(
+        ctx.actor.id,
+        req.file,
+        body.purpose,
+        scoped ? body.projectId! : null,
       );
-      if (env.MALWARE_SCAN_URL) {
-        const scan = await fetch(env.MALWARE_SCAN_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            Authorization: `Bearer ${env.PROVIDER_TOKEN ?? ''}`,
-          },
-          body: new Uint8Array(file.buffer),
-          signal: AbortSignal.timeout(30000),
-        });
-        requireState(
-          scan.ok && ((await scan.json()) as { clean?: boolean }).clean === true,
-          'FILE_SCAN_REJECTED',
-          'The image was not cleared by the scanner.',
-          422,
-        );
-      }
-      const key = `images/${randomUUID()}.${detected.ext}`;
-      await putObject(key, file.buffer, detected.mime);
-      const image = await db.imageAsset.create({
-        data: {
-          purpose: body.purpose,
-          projectId: scoped ? body.projectId : null,
-          uploadedBy: ctx.actor.id,
-          key,
-          name: path.basename(file.originalname).slice(0, 200),
-          mime: detected.mime,
-          size: file.size,
-        },
-      });
       return { id: image.id, name: image.name, mime: image.mime, size: image.size };
     },
   );
@@ -114,11 +70,47 @@ export function imageRoutes(app: Express) {
     'get',
     '/images/:id',
     {
+      audience: 'authenticated',
       summary: 'Get a short-lived image URL after checking record access',
       response: z.object({ url: z.url(), expiresIn: z.number(), name: z.string() }),
     },
     async (ctx, _b, _q, req) => {
       const image = found(await db.imageAsset.findUnique({ where: { id: id(req) } }));
+      if (ctx.actor.accountType === 'CUSTOMER') {
+        const ownPhoto =
+          image.purpose === 'USER'
+            ? image.uploadedBy === ctx.actor.id ||
+              !!(await db.user.findFirst({ where: { id: ctx.actor.id, photoId: image.id } }))
+            : image.purpose === 'CUSTOMER' &&
+              !!(await db.customer.findFirst({
+                where: { portalUserId: ctx.actor.id, photoId: image.id },
+              }));
+        found(ownPhoto ? image : null);
+        return {
+          url: await signedDownload(image.key, image.name, true),
+          expiresIn: 120,
+          name: image.name,
+        };
+      }
+      // A customer account can share its photo across its linked project records.
+      // Staff need customer permissions and access to one of those records.
+      const sharedCustomerPhoto =
+        ['USER', 'CUSTOMER'].includes(image.purpose) &&
+        [...imageGrants.CUSTOMER.read, ...imageGrants.CUSTOMER.write].some((permission) =>
+          ctx.actor.permissions.has(permission),
+        ) &&
+        !!(await db.customer.findFirst({
+          where: {
+            photoId: image.id,
+            project: { access: { some: { userId: ctx.actor.id } } },
+          },
+        }));
+      if (sharedCustomerPhoto)
+        return {
+          url: await signedDownload(image.key, image.name, true),
+          expiresIn: 120,
+          name: image.name,
+        };
       const grants = imageGrants[image.purpose as ImagePurpose];
       requireState(
         grants && [...grants.read, ...grants.write].some((p) => ctx.actor.permissions.has(p)),
@@ -135,7 +127,10 @@ export function imageRoutes(app: Express) {
       else if (image.purpose === 'PROJECT' && image.uploadedBy !== ctx.actor.id)
         found(
           await db.project.findFirst({
-            where: { photoId: image.id, access: { some: { userId: ctx.actor.id } } },
+            where: {
+              OR: [{ photoId: image.id }, { photoIds: { has: image.id } }],
+              access: { some: { userId: ctx.actor.id } },
+            },
           }),
         );
       else if (image.purpose === 'USER' && image.uploadedBy !== ctx.actor.id)

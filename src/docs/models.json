@@ -509,6 +509,13 @@
       "name": "Project",
       "fields": [
         {
+          "name": "photoIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isRequired": true
+        },
+        {
           "name": "photoId",
           "type": "String",
           "kind": "scalar",
@@ -756,6 +763,13 @@
     {
       "name": "Unit",
       "fields": [
+        {
+          "name": "photoIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isRequired": true
+        },
         {
           "name": "photoId",
           "type": "String",

@@ -218,7 +218,9 @@ export function createApp() {
     } else if (error?.code === 'LIMIT_FILE_SIZE') {
       status = 413;
       code = 'FILE_TOO_LARGE';
-      message = 'Maximum file size is 10 MiB.';
+      message = ['/api/v1/images', '/api/v1/portal/profile/photo'].includes(req.path)
+        ? 'Maximum photo size is 5 MiB.'
+        : 'Maximum file size is 10 MiB.';
     } else if (error?.type === 'entity.too.large') {
       status = 413;
       code = 'REQUEST_TOO_LARGE';

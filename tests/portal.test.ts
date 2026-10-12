@@ -29,6 +29,8 @@ import { AppError } from '../src/common/errors.js';
 import { endpoint } from '../src/common/http.js';
 import { hash, decrypt } from '../src/common/security.js';
 import { portalRoutes } from '../src/modules/portal/routes.js';
+import { imageRoutes } from '../src/modules/images/routes.js';
+import { foundationRoutes } from '../src/modules/foundation/routes.js';
 import { authRoutes } from '../src/modules/auth/routes.js';
 import { passwordHash, login } from '../src/modules/auth/service.js';
 import {
@@ -46,6 +48,8 @@ app.use(express.json(), cookieParser(), (_req, res, next) => {
   next();
 });
 authRoutes(app);
+imageRoutes(app);
+foundationRoutes(app);
 portalRoutes(app);
 endpoint(
   app,
@@ -55,9 +59,18 @@ endpoint(
   async () => ({ secret: true }),
 );
 const errors: ErrorRequestHandler = (error, _req, res, _next) => {
-  if (!(error instanceof AppError) && !(error instanceof ZodError)) console.error(error);
+  if (!(error instanceof AppError) && !(error instanceof ZodError) && error.name !== 'MulterError')
+    console.error(error);
   res
-    .status(error instanceof AppError ? error.status : error instanceof ZodError ? 422 : 500)
+    .status(
+      error.code === 'LIMIT_FILE_SIZE'
+        ? 413
+        : error instanceof AppError
+          ? error.status
+          : error instanceof ZodError
+            ? 422
+            : 500,
+    )
     .json({ code: error.code, message: error.message });
 };
 app.use(errors);
@@ -148,6 +161,7 @@ beforeAll(async () => {
   for (const permissionKey of [
     'customers.portal.manage',
     'customers.read',
+    'customers.update',
     'documents.manage',
     'customers.view_sensitive',
   ]) {
@@ -265,6 +279,229 @@ beforeAll(async () => {
 afterAll(async () => closeEmbedded());
 
 describe('customer portal with real Prisma queries and embedded PostgreSQL', () => {
+  it('shows the linked customer photo and syncs a customer upload to the admin record', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1cAAAAASUVORK5CYII=',
+      'base64',
+    );
+    const original = await db.imageAsset.create({
+      data: {
+        purpose: 'CUSTOMER',
+        projectId,
+        uploadedBy: staff,
+        name: 'original.png',
+        key: randomUUID(),
+        mime: 'image/png',
+        size: png.length,
+      },
+    });
+    await db.customer.update({ where: { id: customerA }, data: { photoId: original.id } });
+    expect((await get('/portal/account')).body.data).toMatchObject({
+      id: userA,
+      photoId: original.id,
+    });
+    expect((await get('/images/' + original.id)).status).toBe(200);
+    expect((await get('/images/' + original.id, tokenB)).status).toBe(404);
+    const upload = (token = tokenA) =>
+      request(app)
+        .post('/api/v1/portal/profile/photo')
+        .set('Authorization', 'Bearer ' + token);
+    expect((await upload(staffToken).attach('file', png, 'photo.png')).status).toBe(403);
+    expect(
+      (await request(app).post('/api/v1/portal/profile/photo').attach('file', png, 'photo.png'))
+        .status,
+    ).toBe(401);
+    expect(
+      (await upload().field('name', 'Changed name').attach('file', png, 'photo.png')).status,
+    ).toBe(422);
+    expect((await upload().field('userId', staff).attach('file', png, 'photo.png')).status).toBe(
+      422,
+    );
+    expect((await upload().attach('file', Buffer.from('not an image'), 'photo.png')).status).toBe(
+      422,
+    );
+    const tooLarge = await upload().attach(
+      'file',
+      Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024)]),
+      'large.png',
+    );
+    expect(tooLarge.status).toBe(413);
+    expect((await get('/portal/account')).body.data.photoId).toBe(original.id);
+    const updated = await upload().attach('file', png, 'profile.png');
+    expect(updated.status, updated.text).toBe(201);
+    expect((await get('/portal/account')).body.data).toMatchObject({
+      id: userA,
+      name: 'Alice Customer',
+      email: 'alice@example.invalid',
+      photoId: updated.body.data.id,
+    });
+    expect((await get('/images/' + updated.body.data.id)).status).toBe(200);
+    expect((await get('/images/' + updated.body.data.id, tokenB)).status).toBe(404);
+    expect((await get('/images/' + updated.body.data.id, staffToken)).status).toBe(200);
+    expect(
+      (await get(`/projects/${projectId}/customers/${customerA}`, staffToken)).body.data.photoId,
+    ).toBe(updated.body.data.id);
+    expect((await get(`/projects/${projectId}/customers`, staffToken)).body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: customerA, photoId: updated.body.data.id }),
+      ]),
+    );
+    expect((await db.customer.findUniqueOrThrow({ where: { id: customerB } })).photoId).toBeNull();
+    const saved = await db.imageAsset.findUniqueOrThrow({ where: { id: updated.body.data.id } });
+    expect(saved).toMatchObject({ purpose: 'USER', projectId: null, uploadedBy: userA });
+    expect((await db.user.findUniqueOrThrow({ where: { id: staff } })).photoId).toBeNull();
+    expect(
+      await db.auditLog.count({
+        where: { entityId: userA, action: 'customer.profile_photo_updated' },
+      }),
+    ).toBe(1);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/images')
+          .set('Authorization', 'Bearer ' + tokenA)
+          .field('purpose', 'USER')
+          .attach('file', png, 'photo.png')
+      ).status,
+    ).toBe(403);
+  });
+
+  it('shares photo replacements and removal in both directions across linked profiles while preserving project access and contact details', async () => {
+    const anotherProject = await db.project.create({
+      data: { code: 'PHOTO-SYNC', name: 'Photo sync project' },
+    });
+    const linked = await db.customer.create({
+      data: {
+        projectId: anotherProject.id,
+        portalUserId: userA,
+        name: 'Alice other profile',
+        email: 'alice@example.invalid',
+        phone: '03007654321',
+        reference: randomUUID(),
+        identityEncrypted: 'test',
+        identityHash: randomUUID(),
+        identityLast4: '5678',
+      },
+    });
+    const unlinked = await customer('alice@example.invalid');
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1cAAAAASUVORK5CYII=',
+      'base64',
+    );
+    const upload = await request(app)
+      .post('/api/v1/portal/profile/photo')
+      .set('Authorization', 'Bearer ' + tokenA)
+      .attach('file', png, 'replacement.png');
+    expect(upload.status, upload.text).toBe(201);
+    const photoId = upload.body.data.id;
+    for (const customerId of [customerA, linked.id])
+      expect((await db.customer.findUniqueOrThrow({ where: { id: customerId } })).photoId).toBe(
+        photoId,
+      );
+    expect(await db.customer.findUniqueOrThrow({ where: { id: linked.id } })).toMatchObject({
+      name: linked.name,
+      phone: linked.phone,
+      email: linked.email,
+    });
+    expect(
+      (await db.customer.findUniqueOrThrow({ where: { id: unlinked.id } })).photoId,
+    ).toBeNull();
+    expect((await get('/images/' + photoId, tokenB)).status).toBe(404);
+    expect(
+      (await get(`/projects/${anotherProject.id}/customers/${linked.id}`, staffToken)).status,
+    ).toBe(404);
+    const patch = (customerId: string, body: object) =>
+      request(app)
+        .patch(`/api/v1/projects/${projectId}/customers/${customerId}`)
+        .set('Authorization', 'Bearer ' + staffToken)
+        .send(body);
+    // The unchanged shared USER photo is valid when staff edit other customer fields.
+    expect((await patch(customerA, { photoId, address: 'Updated address' })).status).toBe(200);
+    // It cannot be assigned to an unrelated customer through an admin edit.
+    expect((await patch(customerB, { photoId })).status).toBe(422);
+    const adminPhoto = await db.imageAsset.create({
+      data: {
+        purpose: 'CUSTOMER',
+        projectId,
+        uploadedBy: staff,
+        name: 'admin.png',
+        key: randomUUID(),
+        mime: 'image/png',
+        size: png.length,
+      },
+    });
+    expect((await patch(customerA, { photoId: adminPhoto.id })).status).toBe(200);
+    expect((await get('/portal/account')).body.data.photoId).toBe(adminPhoto.id);
+    expect((await db.customer.findUniqueOrThrow({ where: { id: linked.id } })).photoId).toBe(
+      adminPhoto.id,
+    );
+    expect((await get('/images/' + adminPhoto.id)).status).toBe(200);
+    // A customer reader in the other linked project may see the same profile photo,
+    // without receiving access to the original project or staff profile photos.
+    const reader = await db.user.create({
+      data: {
+        name: 'Photo reader',
+        email: 'photo-reader@example.invalid',
+        passwordHash: await passwordHash(pass),
+      },
+    });
+    const role = await db.role.create({
+      data: {
+        name: 'Photo customer reader',
+        permissions: { create: { permissionKey: 'customers.read' } },
+      },
+    });
+    await db.userRole.create({ data: { userId: reader.id, roleId: role.id } });
+    const readerToken = (await login({ email: reader.email, password: pass }, 'web', randomUUID()))
+      .accessToken;
+    expect((await get('/images/' + photoId, readerToken)).status).toBe(403);
+    expect((await get('/images/' + adminPhoto.id, readerToken)).status).toBe(404);
+    await db.userProjectAccess.create({
+      data: { userId: reader.id, projectId: anotherProject.id },
+    });
+    expect((await get('/images/' + adminPhoto.id, readerToken)).status).toBe(200);
+    // Removing portal access must not hide the retained business photo from staff.
+    await db.customer.update({ where: { id: linked.id }, data: { portalUserId: null } });
+    expect((await get('/images/' + adminPhoto.id, readerToken)).status).toBe(200);
+    await db.customer.update({ where: { id: linked.id }, data: { portalUserId: userA } });
+    expect((await get(`/projects/${projectId}/customers/${customerA}`, readerToken)).status).toBe(
+      404,
+    );
+    expect((await patch(customerA, { photoId: null })).status).toBe(200);
+    expect((await get('/portal/account')).body.data.photoId).toBeNull();
+    expect((await db.customer.findUniqueOrThrow({ where: { id: linked.id } })).photoId).toBeNull();
+    await db.customer.delete({ where: { id: linked.id } });
+    await db.customer.delete({ where: { id: unlinked.id } });
+  });
+
+  it('backfills existing portal photo changes without changing unrelated customer records', async () => {
+    const photo = await db.imageAsset.create({
+      data: {
+        purpose: 'USER',
+        uploadedBy: userA,
+        name: 'existing-portal.png',
+        key: randomUUID(),
+        mime: 'image/png',
+        size: 68,
+      },
+    });
+    await db.user.update({ where: { id: userA }, data: { photoId: photo.id } });
+    const other = await db.customer.findUniqueOrThrow({ where: { id: customerB } });
+    const migration = await readFile(
+      'prisma/migrations/202610120002_customer_profile_photo_sync/migration.sql',
+      'utf8',
+    );
+    await embedded.exec(migration);
+    expect((await db.customer.findUniqueOrThrow({ where: { id: customerA } })).photoId).toBe(
+      photo.id,
+    );
+    expect(await db.customer.findUniqueOrThrow({ where: { id: customerB } })).toEqual(other);
+    await embedded.exec(migration);
+    expect(
+      (await get(`/projects/${projectId}/customers/${customerA}`, staffToken)).body.data.photoId,
+    ).toBe(photo.id);
+    expect((await get('/images/' + photo.id, staffToken)).status).toBe(200);
+  });
   it('keeps existing/default accounts as staff and strips accidental staff grants from customers', async () => {
     expect((await db.user.findUniqueOrThrow({ where: { id: staff } })).accountType).toBe('STAFF');
     const me = await get('/auth/me');
@@ -511,6 +748,9 @@ describe('customer portal with real Prisma queries and embedded PostgreSQL', () 
     });
     await acceptInvitation(token, pass);
     expect((await db.customer.findUniqueOrThrow({ where: { id: c.id } })).portalUserId).toBe(userA);
+    expect((await db.customer.findUniqueOrThrow({ where: { id: c.id } })).photoId).toBe(
+      (await db.user.findUniqueOrThrow({ where: { id: userA } })).photoId,
+    );
     expect((await db.user.findUniqueOrThrow({ where: { id: userA } })).passwordHash).toBe(before);
   });
   it('blocks customer invitations, document sharing, and notification tampering', async () => {

@@ -10,11 +10,12 @@ import { audit, reference, outbox } from '../../common/operations.js';
 import { permissions } from '../../common/permissions.js';
 import { identityHash, encrypt, decrypt } from '../../common/security.js';
 import { passwordHash } from '../auth/service.js';
-import { requireImage, requireUnitImages } from '../images/service.js';
+import { requireImage, requireGalleryImages, requireUnitImages } from '../images/service.js';
 import { defaultAccounts } from '../finance/service.js';
 import { scopedUnit, unitState } from '../inventory/service.js';
 import { consume, requestApproval } from '../approvals/service.js';
 import { emailUser, welcomeUser, webLink } from '../../common/notifications.js';
+import { setCustomerProfilePhoto } from '../portal/profile-photo.js';
 
 const projectBody = z
   .object({
@@ -25,6 +26,7 @@ const projectBody = z
       .regex(/^[A-Z0-9-]+$/),
     name: z.string().min(2).max(200),
     photoId: uuid.optional(),
+    photoIds: z.array(uuid).max(5).optional(),
     currency: z
       .string()
       .regex(/^[A-Z]{3}$/)
@@ -39,12 +41,13 @@ const projectBody = z
     ndcValidityDays: z.number().int().min(1).max(365).default(30),
   })
   .strict();
-const unitBody = z
+const unitFields = z
   .object({
     number: z.string().min(1).max(100),
     type: z.enum(['RESIDENTIAL_PLOT', 'COMMERCIAL_PLOT', 'APARTMENT', 'SHOP', 'OFFICE', 'OTHER']),
     typeDetails: z.string().trim().min(2).max(100).optional(),
     photoId: uuid.optional(),
+    photoIds: z.array(uuid).max(5).optional(),
     featureImages: z
       .array(z.object({ feature: z.string().min(1).max(100), imageId: uuid }).strict())
       .max(30)
@@ -60,15 +63,15 @@ const unitBody = z
     price: positiveMoney,
     charges: money.default('0'),
   })
-  .strict()
-  .superRefine((v, ctx) => {
-    if (v.type === 'OTHER' && !v.typeDetails)
-      ctx.addIssue({
-        code: 'custom',
-        path: ['typeDetails'],
-        message: 'Describe the property type.',
-      });
-  });
+  .strict();
+const unitBody = unitFields.superRefine((v, ctx) => {
+  if (v.type === 'OTHER' && !v.typeDetails)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['typeDetails'],
+      message: 'Describe the property type.',
+    });
+});
 export const customerBody = z
   .object({
     name: z.string().min(2).max(200),
@@ -137,8 +140,8 @@ export function foundationRoutes(app: Express) {
     },
     async (ctx, body) =>
       transaction(async (tx) => {
-        await requireImage(tx, ctx, body.photoId, 'PROJECT');
-        const project = await tx.project.create({ data: body });
+        const gallery = await requireGalleryImages(tx, ctx, body, 'PROJECT');
+        const project = await tx.project.create({ data: { ...body, ...gallery } });
         await tx.userProjectAccess.create({
           data: { userId: ctx.actor.id, projectId: project.id },
         });
@@ -154,15 +157,25 @@ export function foundationRoutes(app: Express) {
     {
       permission: 'projects.update',
       summary: 'Update project business rules',
-      body: projectBody
-        .omit({ code: true })
-        .partial()
-        .extend({ photoId: uuid.nullable().optional() }),
+      body: projectBody.omit({ code: true }).partial().extend({
+        photoId: uuid.nullable().optional(),
+        currency: projectBody.shape.currency.removeDefault().optional(),
+        timezone: projectBody.shape.timezone.removeDefault().optional(),
+        reservationMinutes: projectBody.shape.reservationMinutes.removeDefault().optional(),
+        downPaymentPercent: projectBody.shape.downPaymentPercent.removeDefault().optional(),
+        graceDays: projectBody.shape.graceDays.removeDefault().optional(),
+        ndcValidityDays: projectBody.shape.ndcValidityDays.removeDefault().optional(),
+      }),
     },
     async (ctx, body) =>
       transaction(async (tx) => {
-        await requireImage(tx, ctx, body.photoId, 'PROJECT');
-        const project = await tx.project.update({ where: { id: ctx.projectId }, data: body });
+        await lock(tx, 'Project', ctx.projectId);
+        const current = found(await tx.project.findUnique({ where: { id: ctx.projectId } }));
+        const gallery = await requireGalleryImages(tx, ctx, body, 'PROJECT', current);
+        const project = await tx.project.update({
+          where: { id: ctx.projectId },
+          data: { ...body, ...gallery },
+        });
         await audit(tx, ctx, 'project.updated', project.id, body);
         return project;
       }),
@@ -439,8 +452,8 @@ export function foundationRoutes(app: Express) {
     },
     async (ctx, b) =>
       transaction(async (tx) => {
-        await requireUnitImages(tx, ctx, b);
-        const unit = await tx.unit.create({ data: { ...b, projectId: ctx.projectId } });
+        const gallery = await requireUnitImages(tx, ctx, b);
+        const unit = await tx.unit.create({ data: { ...b, ...gallery, projectId: ctx.projectId } });
         await unitState(tx, ctx, unit.id, 'AVAILABLE', 'Inventory created');
         return unit;
       }),
@@ -457,8 +470,10 @@ export function foundationRoutes(app: Express) {
     async (ctx, b) =>
       transaction(async (tx) => {
         for (const u of b.units) {
-          await requireUnitImages(tx, ctx, u);
-          const unit = await tx.unit.create({ data: { ...u, projectId: ctx.projectId } });
+          const gallery = await requireUnitImages(tx, ctx, u);
+          const unit = await tx.unit.create({
+            data: { ...u, ...gallery, projectId: ctx.projectId },
+          });
           await unitState(tx, ctx, unit.id, 'AVAILABLE', 'Bulk import');
         }
         return { imported: b.units.length };
@@ -504,6 +519,56 @@ export function foundationRoutes(app: Express) {
           include: { history: { orderBy: { createdAt: 'desc' }, take: 100 } },
         }),
       ),
+  );
+  endpoint(
+    app,
+    'patch',
+    root + '/units/:id',
+    {
+      permission: 'inventory.update',
+      summary:
+        'Update property details and up to five photos; price changes use the approval workflow',
+      body: unitFields.omit({ price: true, charges: true }).partial().extend({
+        photoId: uuid.nullable().optional(),
+        features: unitFields.shape.features.removeDefault().optional(),
+        featureImages: unitFields.shape.featureImages.removeDefault().optional(),
+      }),
+    },
+    async (ctx, body, _q, req) =>
+      transaction(async (tx) => {
+        const current = await scopedUnit(tx, ctx, id(req));
+        requireState(
+          (body.type ?? current.type) !== 'OTHER' ||
+            Boolean(body.typeDetails ?? current.typeDetails),
+          'PROPERTY_TYPE_REQUIRED',
+          'Describe the property type.',
+          422,
+        );
+        const gallery = await requireUnitImages(
+          tx,
+          ctx,
+          {
+            ...body,
+            features: body.features ?? current.features,
+            featureImages:
+              body.featureImages ??
+              z
+                .array(z.object({ feature: z.string(), imageId: uuid }))
+                .parse(current.featureImages),
+          },
+          current,
+        );
+        const unit = await tx.unit.update({
+          where: { id: current.id },
+          data: {
+            ...body,
+            ...gallery,
+            ...((body.type ?? current.type) !== 'OTHER' ? { typeDetails: null } : {}),
+          },
+        });
+        await audit(tx, ctx, 'inventory.updated', unit.id, body);
+        return unit;
+      }),
   );
   endpoint(
     app,
@@ -636,6 +701,7 @@ export function foundationRoutes(app: Express) {
         });
         await audit(tx, ctx, 'customer.created', customer.id);
         if (portalUserId) {
+          if (customer.photoId) await setCustomerProfilePhoto(tx, portalUserId, customer.photoId);
           await audit(tx, ctx, 'customer.portal_account_created', customer.id);
           await welcomeUser(tx, portalUserId);
         } else if (customer.email) {
@@ -750,13 +816,19 @@ export function foundationRoutes(app: Express) {
     },
     async (ctx, b, _q, req) =>
       transaction(async (tx) => {
-        found(await tx.customer.findFirst({ where: { id: id(req), projectId: ctx.projectId } }));
-        await requireImage(tx, ctx, b.photoId, 'CUSTOMER');
+        const current = found(
+          await tx.customer.findFirst({ where: { id: id(req), projectId: ctx.projectId } }),
+        );
+        // A portal photo is shared with the account and can originate in another
+        // linked project. Keeping that existing photo must not fail contact edits.
+        if (b.photoId !== current.photoId) await requireImage(tx, ctx, b.photoId, 'CUSTOMER');
         const result = await tx.customer.update({
           where: { id: id(req) },
           data: b,
           select: publicCustomer,
         });
+        if (current.portalUserId && b.photoId !== undefined && b.photoId !== current.photoId)
+          await setCustomerProfilePhoto(tx, current.portalUserId, b.photoId);
         await audit(tx, ctx, 'customer.updated', id(req));
         return result;
       }),

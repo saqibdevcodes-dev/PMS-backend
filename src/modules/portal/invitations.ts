@@ -9,6 +9,7 @@ import { throttle } from '../../integrations/redis.js';
 import { env } from '../../config/env.js';
 import { sendEmail } from '../../integrations/notifications.js';
 import { emailUser, welcomeUser, webLink } from '../../common/notifications.js';
+import { setCustomerProfilePhoto } from './profile-photo.js';
 
 export async function inviteCustomer(ctx: Context, customerId: string) {
   requireState(
@@ -134,6 +135,8 @@ export async function acceptInvitation(token: string, password: string) {
       where: { id: invitation.customerId },
       data: { portalUserId: user.id },
     });
+    const photoId = user.photoId ?? invitation.customer.photoId;
+    if (photoId) await setCustomerProfilePhoto(tx, user.id, photoId);
     await tx.customerInvitation.update({
       where: { id: invitation.id },
       data: { usedAt: new Date() },

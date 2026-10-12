@@ -49,6 +49,16 @@ export function salesRoutes(app: Express) {
   endpoint(
     app,
     'post',
+    root + '/reservations/:id/release',
+    {
+      permission: 'reservations.create',
+      summary: 'Release your own unfinished booking hold to change customer or property',
+    },
+    async (ctx, _b, _q, req) => sales.cancelReservation(ctx, id(req), true),
+  );
+  endpoint(
+    app,
+    'post',
     root + '/reservations/:id/cancel',
     {
       permission: 'reservations.cancel',

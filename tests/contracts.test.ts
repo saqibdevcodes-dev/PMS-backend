@@ -105,4 +105,26 @@ describe('generated API contract', () => {
       });
     }
   });
+
+  it('documents a customer-only photo upload and a scoped release for unfinished booking holds', () => {
+    expect(routeDocs.find((route) => route.path === '/portal/profile/photo')).toMatchObject({
+      audience: 'customer',
+      multipart: true,
+    });
+    expect(spec.paths['/portal/profile/photo']?.post).toMatchObject({
+      requestBody: {
+        content: {
+          'multipart/form-data': {
+            schema: {
+              properties: { file: { type: 'string', format: 'binary' } },
+              required: expect.arrayContaining(['file']),
+            },
+          },
+        },
+      },
+    });
+    expect(
+      routeDocs.find((route) => route.path === '/projects/:projectId/reservations/:id/release'),
+    ).toMatchObject({ permission: 'reservations.create' });
+  });
 });

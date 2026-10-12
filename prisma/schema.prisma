@@ -178,6 +178,7 @@ model Device {
 }
 
 model Project {
+  photoIds      String[] @default([]) @db.Uuid
   photoId       String? @db.Uuid
   photo         ImageAsset? @relation("ProjectPhoto", fields: [photoId], references: [id], onDelete: Restrict)
   id                 String              @id @default(uuid()) @db.Uuid
@@ -220,6 +221,7 @@ model ProjectSetting {
 }
 
 model Unit {
+  photoIds      String[] @default([]) @db.Uuid
   photoId       String? @db.Uuid
   photo         ImageAsset? @relation("UnitPhoto", fields: [photoId], references: [id], onDelete: Restrict)
   typeDetails   String?

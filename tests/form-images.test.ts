@@ -26,7 +26,9 @@ vi.mock('../src/modules/auth/service.js', async (original) => ({
           ? ['inventory.read']
           : token === 'creator'
             ? ['customers.create', 'customers.update', 'customers.read']
-            : permissions,
+            : token === 'booker'
+              ? ['inventory.read', 'reservations.create', 'bookings.create']
+              : permissions,
       ),
     };
   },
@@ -44,6 +46,7 @@ import { foundationRoutes } from '../src/modules/foundation/routes.js';
 import { crmRoutes } from '../src/modules/crm/routes.js';
 import { documentRoutes } from '../src/modules/documents/routes.js';
 import { createPayment } from '../src/modules/sales/service.js';
+import { salesRoutes } from '../src/modules/sales/routes.js';
 import { signedDownload, putObject } from '../src/integrations/storage.js';
 import { login } from '../src/modules/auth/service.js';
 
@@ -56,6 +59,7 @@ imageRoutes(app);
 foundationRoutes(app);
 crmRoutes(app);
 documentRoutes(app);
+salesRoutes(app);
 const errors: ErrorRequestHandler = (error, _req, res, _next) => {
   res
     .status(
@@ -191,6 +195,66 @@ beforeAll(async () => {
 afterAll(closeEmbedded);
 
 describe('private record images and guided form contracts', () => {
+  it('releases only your own unfinished hold and leaves subsequent holds and booked reservations intact', async () => {
+    const unit = await post(`/projects/${projectId}/units`).send({
+      number: 'HOLD-EDIT',
+      type: 'RESIDENTIAL_PLOT',
+      size: '5',
+      measurementUnit: 'marla',
+      price: '1000',
+    });
+    const customer = await db.customer.create({
+      data: {
+        projectId,
+        name: 'Booking customer',
+        phone: '03001234567',
+        reference: randomUUID(),
+        identityHash: randomUUID(),
+        identityEncrypted: 'test',
+        identityLast4: '1234',
+      },
+    });
+    const reserve = () =>
+      post(`/projects/${projectId}/reservations`, 'booker').send({
+        unitId: unit.body.data.id,
+        customerId: customer.id,
+      });
+    const first = await reserve();
+    expect(first.status, first.text).toBe(201);
+    const path = `/projects/${projectId}/reservations/${first.body.data.id}`;
+    expect((await post(path + '/cancel', 'booker').send({})).status).toBe(403);
+    await db.userProjectAccess.create({ data: { userId: otherId, projectId } });
+    expect((await post(path + '/release', 'other').send({})).status).toBe(403);
+    await db.userProjectAccess.delete({
+      where: { userId_projectId: { userId: otherId, projectId } },
+    });
+    expect((await post(path + '/release', 'booker').send({})).status).toBe(200);
+    expect((await db.unit.findUniqueOrThrow({ where: { id: unit.body.data.id } })).status).toBe(
+      'AVAILABLE',
+    );
+    const next = await reserve();
+    expect(next.status).toBe(201);
+    // Retrying an uncertain old release must never release the replacement hold.
+    expect((await post(path + '/release', 'booker').send({})).status).toBe(200);
+    expect((await db.unit.findUniqueOrThrow({ where: { id: unit.body.data.id } })).status).toBe(
+      'RESERVED',
+    );
+    await db.reservation.update({
+      where: { id: next.body.data.id },
+      data: { status: 'CONVERTED' },
+    });
+    expect(
+      (
+        await post(
+          `/projects/${projectId}/reservations/${next.body.data.id}/release`,
+          'booker',
+        ).send({})
+      ).status,
+    ).toBe(409);
+    expect((await db.unit.findUniqueOrThrow({ where: { id: unit.body.data.id } })).status).toBe(
+      'RESERVED',
+    );
+  });
   it('requires authentication, staff access, purpose permission and project membership', async () => {
     expect(
       (await request(app).post('/api/v1/images').attach('file', png, 'photo.png')).status,
@@ -250,7 +314,7 @@ describe('private record images and guided form contracts', () => {
     expect(preview.status).toBe(200);
     expect(preview.body.data.expiresIn).toBe(120);
     expect((await get('/images/' + photoId, 'other')).status).toBe(404);
-    expect((await get('/images/' + photoId, 'customer')).status).toBe(403);
+    expect((await get('/images/' + photoId, 'customer')).status).toBe(404);
     const cleared = await request(app)
       .patch('/api/v1/projects/' + created.body.data.id)
       .set('Authorization', 'Bearer staff')
@@ -328,6 +392,145 @@ describe('private record images and guided form contracts', () => {
     ).toBe('IMAGE_SCOPE_MISMATCH');
     expect((await get('/images/' + photoId, 'other')).status).toBe(404);
   });
+  it('saves five project photos, allows members to retain them, and supports replacing, reordering and clearing', async () => {
+    const photoIds = [];
+    for (let i = 0; i < 5; i++) photoIds.push(await upload('PROJECT'));
+    const created = await post('/projects').send({
+      name: 'Gallery project',
+      code: 'GALLERY',
+      currency: 'AED',
+      graceDays: 7,
+      photoIds,
+    });
+    expect(created.status, created.text).toBe(201);
+    expect(created.body.data).toMatchObject({ photoIds, photoId: photoIds[0] });
+    const galleryProject = created.body.data.id;
+    const patch = (body: unknown, token = 'staff') =>
+      request(app)
+        .patch('/api/v1/projects/' + galleryProject)
+        .set('Authorization', 'Bearer ' + token)
+        .send(body);
+    expect((await get('/images/' + photoIds[4], 'other')).status).toBe(404);
+    expect((await patch({ photoIds }, 'other')).status).toBe(404);
+    await db.userProjectAccess.create({ data: { userId: otherId, projectId: galleryProject } });
+    expect((await get('/images/' + photoIds[4], 'other')).status).toBe(200);
+    expect((await patch({ photoIds }, 'other')).status).toBe(200);
+    expect((await patch({ name: 'Renamed gallery' })).body.data).toMatchObject({
+      photoIds,
+      currency: 'AED',
+      graceDays: 7,
+    });
+    const replacement = await upload('PROJECT');
+    expect((await patch({ photoIds: [...photoIds, replacement] })).status).toBe(422);
+    expect((await patch({ photoIds: [photoIds[0], photoIds[0]] })).body.code).toBe(
+      'INVALID_GALLERY',
+    );
+    expect((await patch({ photoIds, photoId: photoIds[1] })).body.code).toBe('INVALID_GALLERY');
+    // An older client can replace just the cover without losing the other four photos.
+    const legacy = await patch({ photoId: replacement });
+    expect(legacy.body.data.photoIds).toEqual([replacement, ...photoIds.slice(1)]);
+    const next = [photoIds[4], replacement, ...photoIds.slice(1, 4)];
+    const reordered = await patch({ photoIds: next });
+    expect(reordered.body.data).toMatchObject({ photoIds: next, photoId: next[0] });
+    const cleared = await patch({ photoIds: [] });
+    expect(cleared.status, cleared.text).toBe(200);
+    expect(cleared.body.data).toMatchObject({ photoIds: [], photoId: null });
+    expect((await get('/images/' + photoIds[4], 'other')).status).toBe(404);
+    const otherUpload = await db.imageAsset.create({
+      data: {
+        purpose: 'PROJECT',
+        uploadedBy: otherId,
+        key: randomUUID(),
+        name: 'private.png',
+        mime: 'image/png',
+        size: 1,
+      },
+    });
+    expect((await patch({ photoIds: [otherUpload.id] })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
+  });
+  it('edits property galleries within project scope without allowing price or status changes', async () => {
+    const photoIds = [];
+    for (let i = 0; i < 5; i++) photoIds.push(await upload('UNIT', projectId));
+    const featureImages = [{ feature: 'Balcony', imageId: await upload('FEATURE', projectId) }];
+    const created = await post(`/projects/${projectId}/units`).send({
+      number: 'GALLERY-1',
+      type: 'APARTMENT',
+      size: '100',
+      measurementUnit: 'sq ft',
+      price: '1000',
+      photoIds,
+      features: ['Balcony'],
+      featureImages,
+    });
+    expect(created.status, created.text).toBe(201);
+    expect(created.body.data).toMatchObject({ photoIds, photoId: photoIds[0] });
+    const path = `/projects/${projectId}/units/${created.body.data.id}`;
+    const patch = (body: unknown, token = 'staff', url = path) =>
+      request(app)
+        .patch('/api/v1' + url)
+        .set('Authorization', 'Bearer ' + token)
+        .send(body);
+    expect((await patch({ photoIds }, 'viewer')).status).toBe(403);
+    expect((await patch({ photoIds }, 'other')).status).toBe(404);
+    expect(
+      (
+        await patch(
+          { photoIds },
+          'staff',
+          `/projects/${otherProject}/units/${created.body.data.id}`,
+        )
+      ).status,
+    ).toBe(404);
+    for (const body of [
+      { price: '1' },
+      { charges: '1' },
+      { status: 'SOLD' },
+      { photoIds: [...photoIds, photoIds[0]] },
+    ])
+      expect((await patch(body)).status).toBe(422);
+    expect((await patch({ number: 'GALLERY-UPDATED' })).body.data).toMatchObject({
+      photoIds,
+      features: ['Balcony'],
+      featureImages,
+    });
+    expect((await patch({ photoIds: [photoIds[0], photoIds[0]] })).body.code).toBe(
+      'INVALID_GALLERY',
+    );
+    const wrongPurpose = await upload('FEATURE', projectId);
+    expect((await patch({ photoIds: [wrongPurpose] })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
+    const foreign = await db.imageAsset.create({
+      data: {
+        projectId: otherProject,
+        purpose: 'UNIT',
+        uploadedBy: staffId,
+        key: randomUUID(),
+        name: 'foreign.png',
+        mime: 'image/png',
+        size: 1,
+      },
+    });
+    expect((await patch({ photoIds: [foreign.id] })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
+    expect((await patch({ photoIds: [randomUUID()] })).status).toBe(404);
+    const replacement = await upload('UNIT', projectId);
+    const next = [replacement, ...photoIds.slice(1)];
+    const updated = await patch({ photoIds: next });
+    expect(updated.status, updated.text).toBe(200);
+    expect((await get(path)).body.data).toMatchObject({
+      photoIds: next,
+      photoId: replacement,
+      price: '1000',
+    });
+    expect((await patch({ photoIds: [] })).body.data).toMatchObject({
+      photoIds: [],
+      photoId: null,
+    });
+    const saved = await db.unit.findUniqueOrThrow({ where: { id: created.body.data.id } });
+    expect(saved.price.toString()).toBe('1000');
+    expect(saved.status).toBe('AVAILABLE');
+    expect(
+      await db.auditLog.count({ where: { entityId: saved.id, action: 'inventory.updated' } }),
+    ).toBeGreaterThan(0);
+  });
   it('requires dealer and new staff photos and validates their purpose', async () => {
     const dealer = { name: 'Dealer', phone: '03001234567', commissionPercent: '2' };
     expect((await post(`/projects/${projectId}/dealers`).send(dealer)).status).toBe(422);
@@ -376,7 +579,7 @@ describe('private record images and guided form contracts', () => {
     expect((await get('/images/' + photoId, 'creator')).status).toBe(200);
     expect((await get('/images/' + photoId, 'other')).status).toBe(404);
     expect((await get('/images/' + photoId, 'viewer')).status).toBe(403);
-    expect((await get('/images/' + photoId, 'customer')).status).toBe(403);
+    expect((await get('/images/' + photoId, 'customer')).status).toBe(404);
     const replacement = await upload('CUSTOMER', projectId);
     for (const nextPhoto of [replacement, null]) {
       const updated = await request(app)

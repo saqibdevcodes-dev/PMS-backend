@@ -67,7 +67,7 @@ export function buildOpenApi() {
   Object.assign(schemas, extraSchemas);
   const paths: Record<string, Record<string, unknown>> = {};
   for (const route of routeDocs) {
-    const portalResponse = portalContract(route.path, route.method);
+    const portalResponse = route.response ? undefined : portalContract(route.path, route.method);
     const path = route.path.replace(/:([A-Za-z]+)/g, '{$1}');
     const parameters: unknown[] = [];
     for (const match of route.path.matchAll(/:([A-Za-z]+)/g))

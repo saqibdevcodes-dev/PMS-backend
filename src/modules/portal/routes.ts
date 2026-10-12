@@ -13,10 +13,13 @@ import { db, transaction } from '../../database/client.js';
 import { found, requireState } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
 import { customerUpdate } from '../../common/notifications.js';
+import { authenticate } from '../auth/service.js';
+import { imageUpload, uploadImage } from '../images/upload.js';
 import { signedDownload } from '../../integrations/storage.js';
 import { ownedBookings, visibleDocuments } from './access.js';
 import { customerStatement } from './statement.js';
 import { inviteCustomer, acceptInvitation, revokeCustomer } from './invitations.js';
+import { setCustomerProfilePhoto } from './profile-photo.js';
 import {
   dashboard,
   bookingSelect,
@@ -32,6 +35,73 @@ const portal = { audience: 'customer' as const };
 const listQuery = paginationQuery.extend({ bookingId: uuid.optional() });
 const adminRoot = '/projects/:projectId/customers/:id/portal';
 export function portalRoutes(app: Express) {
+  app.post(
+    '/api/v1/portal/profile/photo',
+    async (req, _res, next) => {
+      const actor = await authenticate(req.headers.authorization?.replace(/^Bearer /, '') ?? '');
+      requireState(
+        actor.accountType === 'CUSTOMER',
+        'CUSTOMER_ACCOUNT_REQUIRED',
+        'Sign in with your customer account.',
+        403,
+      );
+      next();
+    },
+    imageUpload,
+  );
+  endpoint(
+    app,
+    'post',
+    '/portal/profile/photo',
+    {
+      ...portal,
+      summary: 'Update only your own profile photo; JPEG, PNG or WebP up to 5 MiB',
+      multipart: true,
+      body: z.object({}).strict(),
+      status: 201,
+      response: z.object({ id: uuid, name: z.string(), mime: z.string(), size: z.number() }),
+    },
+    async (ctx, _body, _query, req) => {
+      const image = await uploadImage(ctx.actor.id, req.file, 'USER');
+      await transaction(async (tx) => {
+        await setCustomerProfilePhoto(tx, ctx.actor.id, image.id);
+        await audit(tx, ctx, 'customer.profile_photo_updated', ctx.actor.id, { photoId: image.id });
+      });
+      return { id: image.id, name: image.name, mime: image.mime, size: image.size };
+    },
+  );
+  endpoint(
+    app,
+    'get',
+    '/portal/account',
+    {
+      ...portal,
+      summary:
+        'Your account identity and profile photo, falling back to your linked customer photo',
+      response: z.object({
+        id: uuid,
+        name: z.string(),
+        email: z.string(),
+        photoId: uuid.nullable(),
+      }),
+    },
+    async (ctx) => {
+      const user = found(
+        await db.user.findUnique({
+          where: { id: ctx.actor.id },
+          select: { id: true, name: true, email: true, photoId: true },
+        }),
+      );
+      const linked = !user.photoId
+        ? await db.customer.findFirst({
+            where: { portalUserId: ctx.actor.id, photoId: { not: null } },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+            select: { photoId: true },
+          })
+        : null;
+      return { ...user, photoId: user.photoId ?? linked?.photoId ?? null };
+    },
+  );
   endpoint(
     app,
     'get',

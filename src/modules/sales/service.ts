@@ -71,7 +71,7 @@ export async function reserve(ctx: Context, input: { unitId: string; customerId:
     return reservation;
   });
 }
-export async function cancelReservation(ctx: Context, reservationId: string) {
+export async function cancelReservation(ctx: Context, reservationId: string, ownOnly = false) {
   return transaction(async (tx) => {
     const row = found(
       await tx.reservation.findFirst({
@@ -80,6 +80,13 @@ export async function cancelReservation(ctx: Context, reservationId: string) {
     );
     await scopedUnit(tx, ctx, row.unitId);
     const current = found(await tx.reservation.findUnique({ where: { id: row.id } }));
+    requireState(
+      !ownOnly || current.createdBy === ctx.actor.id,
+      'FORBIDDEN',
+      'You can only release your own unfinished property hold.',
+      403,
+    );
+    if (ownOnly && ['CANCELLED', 'EXPIRED'].includes(current.status)) return { cancelled: true };
     requireState(
       current.status === 'ACTIVE',
       'RESERVATION_CLOSED',
