@@ -53,7 +53,8 @@ export async function login(
     await lock(tx, 'User', user.id);
     const current = found(await tx.user.findUnique({ where: { id: user.id } }));
     if (!current.active || current.passwordHash !== user.passwordHash) throw authError();
-    if (!current.firstLoginAt) await tx.user.update({ where: { id: user.id }, data: { firstLoginAt: new Date() } });
+    if (!current.firstLoginAt)
+      await tx.user.update({ where: { id: user.id }, data: { firstLoginAt: new Date() } });
     const session = await tx.session.create({
       data: {
         userId: user.id,
@@ -188,7 +189,10 @@ export async function changePassword(ctx: Context, oldPassword: string, newPassw
       'CREDENTIAL_CHANGED',
       'Credentials changed; sign in again.',
     );
-    await tx.user.update({ where: { id: user.id }, data: { passwordHash: nextHash, credentialsIssuedAt: null } });
+    await tx.user.update({
+      where: { id: user.id },
+      data: { passwordHash: nextHash, credentialsIssuedAt: null },
+    });
     await tx.session.updateMany({ where: { userId: user.id }, data: { revokedAt: new Date() } });
     await audit(tx, ctx, 'auth.password_changed', user.id);
     await passwordChangedEmail(tx, user.id);
@@ -229,7 +233,10 @@ export async function resetPassword(token: string, password: string) {
       'The reset token is invalid or expired.',
       400,
     );
-    await tx.user.update({ where: { id: reset.userId }, data: { passwordHash: nextHash, credentialsIssuedAt: null } });
+    await tx.user.update({
+      where: { id: reset.userId },
+      data: { passwordHash: nextHash, credentialsIssuedAt: null },
+    });
     await tx.passwordReset.updateMany({
       where: { userId: reset.userId, usedAt: null },
       data: { usedAt: new Date() },

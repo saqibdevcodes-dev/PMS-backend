@@ -16,7 +16,12 @@ export function visibleDocuments(userId: string): Prisma.DocumentWhereInput {
       // Customer-specific documents must never become visible to a different/new booking owner.
       { customer: { portalUserId: userId } },
       { customerId: null, booking: ownedBookings(userId) },
-      { allProjectCustomers: true, customerId: null, bookingId: null, project: { customers: { some: { portalUserId: userId } } } },
+      {
+        allProjectCustomers: true,
+        customerId: null,
+        bookingId: null,
+        project: { customers: { some: { portalUserId: userId } } },
+      },
     ],
   };
 }

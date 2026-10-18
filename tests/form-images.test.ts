@@ -205,25 +205,88 @@ afterAll(closeEmbedded);
 
 describe('installment collection and committed inventory', () => {
   async function collectionFixture() {
-    const project = await post('/projects').send({ name: 'Collection ' + randomUUID().slice(0, 8), location: 'Karachi' });
+    const project = await post('/projects').send({
+      name: 'Collection ' + randomUUID().slice(0, 8),
+      location: 'Karachi',
+    });
     expect(project.status, project.text).toBe(201);
     const pid = project.body.data.id as string;
     await db.userProjectAccess.create({ data: { userId: otherId, projectId: pid } });
-    const buyer = await db.customer.create({ data: { projectId: pid, reference: randomUUID(), name: 'Collection buyer', phone: '03001234567', identityEncrypted: 'test', identityHash: randomUUID(), identityLast4: '0001' } });
-    const unit = await db.unit.create({ data: { projectId: pid, number: 'C-01', type: 'APARTMENT', size: '100', measurementUnit: 'sq ft', price: '1000', status: 'SOLD' } });
-    const booking = await db.booking.create({ data: { reference: randomUUID(), unitId: unit.id, customerId: buyer.id, basePrice: '1000', charges: '0', discount: '0', total: '1000', downPayment: '200', createdBy: staffId, paymentType: 'INSTALLMENTS', status: 'CONFIRMED', owners: { create: { customerId: buyer.id, share: '100' } } } });
-    const first = await db.installment.create({ data: { bookingId: booking.id, sequence: 0, version: 1, label: 'Down payment', dueDate: new Date('2026-01-01'), amount: '200' } });
-    const second = await db.installment.create({ data: { bookingId: booking.id, sequence: 1, version: 1, label: 'First installment', dueDate: new Date('2026-02-01'), amount: '800' } });
+    const buyer = await db.customer.create({
+      data: {
+        projectId: pid,
+        reference: randomUUID(),
+        name: 'Collection buyer',
+        phone: '03001234567',
+        identityEncrypted: 'test',
+        identityHash: randomUUID(),
+        identityLast4: '0001',
+      },
+    });
+    const unit = await db.unit.create({
+      data: {
+        projectId: pid,
+        number: 'C-01',
+        type: 'APARTMENT',
+        size: '100',
+        measurementUnit: 'sq ft',
+        price: '1000',
+        status: 'SOLD',
+      },
+    });
+    const booking = await db.booking.create({
+      data: {
+        reference: randomUUID(),
+        unitId: unit.id,
+        customerId: buyer.id,
+        basePrice: '1000',
+        charges: '0',
+        discount: '0',
+        total: '1000',
+        downPayment: '200',
+        createdBy: staffId,
+        paymentType: 'INSTALLMENTS',
+        status: 'CONFIRMED',
+        owners: { create: { customerId: buyer.id, share: '100' } },
+      },
+    });
+    const first = await db.installment.create({
+      data: {
+        bookingId: booking.id,
+        sequence: 0,
+        version: 1,
+        label: 'Down payment',
+        dueDate: new Date('2026-01-01'),
+        amount: '200',
+      },
+    });
+    const second = await db.installment.create({
+      data: {
+        bookingId: booking.id,
+        sequence: 1,
+        version: 1,
+        label: 'First installment',
+        dueDate: new Date('2026-02-01'),
+        amount: '800',
+      },
+    });
     const base = '/projects/' + pid;
     const input = { expectedAmount: '200', method: 'CASH', paidAt: new Date().toISOString() };
-    const collect = (id: string, body = input, key = randomUUID(), token = 'staff') => post(base + '/installments/' + id + '/payment', token).set('Idempotency-Key', key).send(body);
+    const collect = (id: string, body = input, key = randomUUID(), token = 'staff') =>
+      post(base + '/installments/' + id + '/payment', token)
+        .set('Idempotency-Key', key)
+        .send(body);
     return { pid, base, booking, unit, first, second, input, collect };
   }
   it('atomically approves cash once, enforces the next installment and rejects stale amounts', async () => {
     const f = await collectionFixture();
     expect((await f.collect(f.first.id, f.input, randomUUID(), 'booker')).status).toBe(403);
-    expect((await f.collect(f.second.id, { ...f.input, expectedAmount: '800' })).body.code).toBe('INSTALLMENT_NOT_NEXT');
-    expect((await f.collect(f.first.id, { ...f.input, expectedAmount: '201' })).body.code).toBe('INSTALLMENT_AMOUNT_CHANGED');
+    expect((await f.collect(f.second.id, { ...f.input, expectedAmount: '800' })).body.code).toBe(
+      'INSTALLMENT_NOT_NEXT',
+    );
+    expect((await f.collect(f.first.id, { ...f.input, expectedAmount: '201' })).body.code).toBe(
+      'INSTALLMENT_AMOUNT_CHANGED',
+    );
     const key = randomUUID();
     const result = await f.collect(f.first.id, f.input, key);
     expect(result.status, result.text).toBe(200);
@@ -234,21 +297,43 @@ describe('installment collection and committed inventory', () => {
     expect(await db.receipt.count({ where: { paymentId: result.body.data.id } })).toBe(1);
     expect((await f.collect(f.first.id)).body.code).toBe('INSTALLMENT_NOT_NEXT');
     const listing = await get(f.base + '/bookings');
-    expect(listing.body.data.items).toContainEqual(expect.objectContaining({ id: f.booking.id, paid: '200.00', outstanding: '800.00', pendingPayments: 0, customer: expect.objectContaining({ name: 'Collection buyer' }), unit: expect.objectContaining({ size: '100' }) }));
-    const edited = await request(app).patch('/api/v1' + f.base + '/units/' + f.unit.id).set('Authorization', 'Bearer staff').send({ phase: 'Changed' });
+    expect(listing.body.data.items).toContainEqual(
+      expect.objectContaining({
+        id: f.booking.id,
+        paid: '200.00',
+        outstanding: '800.00',
+        pendingPayments: 0,
+        customer: expect.objectContaining({ name: 'Collection buyer' }),
+        unit: expect.objectContaining({ size: '100' }),
+      }),
+    );
+    const edited = await request(app)
+      .patch('/api/v1' + f.base + '/units/' + f.unit.id)
+      .set('Authorization', 'Bearer staff')
+      .send({ phase: 'Changed' });
     expect(edited.body.code).toBe('UNIT_COMMITTED');
-    expect((await post(f.base + '/units/' + f.unit.id + '/price').send({ price: '1500', charges: '0' })).status).not.toBe(200);
-    expect((await db.unit.findUniqueOrThrow({ where: { id: f.unit.id } })).price.toString()).toBe('1000');
+    expect(
+      (await post(f.base + '/units/' + f.unit.id + '/price').send({ price: '1500', charges: '0' }))
+        .status,
+    ).not.toBe(200);
+    expect((await db.unit.findUniqueOrThrow({ where: { id: f.unit.id } })).price.toString()).toBe(
+      '1000',
+    );
   });
   it('requires cheque numbers, prevents duplicate pending collections and requires an independent verifier', async () => {
     const f = await collectionFixture();
-    expect((await f.collect(f.first.id, { ...f.input, method: 'CHEQUE' })).body.code).toBe('PAYMENT_REFERENCE_REQUIRED');
+    expect((await f.collect(f.first.id, { ...f.input, method: 'CHEQUE' })).body.code).toBe(
+      'PAYMENT_REFERENCE_REQUIRED',
+    );
     const body = { ...f.input, method: 'CHEQUE', transactionReference: 'CH-1001' };
     const result = await f.collect(f.first.id, body);
     expect(result.status, result.text).toBe(200);
     expect(result.body.data.status).toBe('PENDING');
     expect((await f.collect(f.first.id, body)).body.code).toBe('PAYMENT_PENDING');
-    const verify = (token: string) => post(f.base + '/payments/' + result.body.data.id + '/verify', token).set('Idempotency-Key', randomUUID()).send({ decision: 'CLEARED', reason: 'Funds received in bank' });
+    const verify = (token: string) =>
+      post(f.base + '/payments/' + result.body.data.id + '/verify', token)
+        .set('Idempotency-Key', randomUUID())
+        .send({ decision: 'CLEARED', reason: 'Funds received in bank' });
     expect((await verify('staff')).body.code).toBe('SELF_VERIFICATION_FORBIDDEN');
     const approved = await verify('other');
     expect(approved.status, approved.text).toBe(200);
@@ -256,12 +341,21 @@ describe('installment collection and committed inventory', () => {
   });
   it('requires bank proof, transaction ID and receiving account in the same project', async () => {
     const f = await collectionFixture();
-    const account = await db.account.findFirstOrThrow({ where: { projectId: f.pid, type: 'ASSET' } });
+    const account = await db.account.findFirstOrThrow({
+      where: { projectId: f.pid, type: 'ASSET' },
+    });
     const body = { ...f.input, method: 'BANK_TRANSFER', transactionReference: 'TX-1' };
     expect((await f.collect(f.first.id, body)).body.code).toBe('BANK_ACCOUNT_REQUIRED');
-    expect((await f.collect(f.first.id, { ...body, receivingAccountId: account.id } as typeof body)).body.code).toBe('PAYMENT_PROOF_REQUIRED');
+    expect(
+      (await f.collect(f.first.id, { ...body, receivingAccountId: account.id } as typeof body)).body
+        .code,
+    ).toBe('PAYMENT_PROOF_REQUIRED');
     const proofImageId = await upload('PAYMENT', f.pid);
-    const result = await f.collect(f.first.id, { ...body, proofImageId, receivingAccountId: account.id } as typeof body);
+    const result = await f.collect(f.first.id, {
+      ...body,
+      proofImageId,
+      receivingAccountId: account.id,
+    } as typeof body);
     expect(result.status, result.text).toBe(200);
     expect(result.body.data.status).toBe('PENDING');
     expect(await db.receipt.count({ where: { paymentId: result.body.data.id } })).toBe(0);
@@ -1030,7 +1124,12 @@ describe('private record images and guided form contracts', () => {
   });
   it('rejects customer photos with the wrong purpose or project on creation and editing', async () => {
     const path = `/projects/${projectId}/customers`;
-    const body = { name: 'Photo scope customer', phone: '03001234567', identity: nationalId(), email: 'photo-scope@example.invalid' };
+    const body = {
+      name: 'Photo scope customer',
+      phone: '03001234567',
+      identity: nationalId(),
+      email: 'photo-scope@example.invalid',
+    };
     const created = await post(path).send(body);
     expect(created.status, created.text).toBe(201);
     expect(created.body.data.photoId).toBeNull();
@@ -1086,14 +1185,24 @@ describe('private record images and guided form contracts', () => {
     const user = await db.user.findUniqueOrThrow({ where: { email } });
     expect(customer.portalUserId).toBe(user.id);
     expect(user.accountType).toBe('CUSTOMER');
-    const event = await db.outbox.findFirstOrThrow({ where: { kind: 'customer-credentials', payload: { path: ['customerId'], equals: customer.id } } });
+    const event = await db.outbox.findFirstOrThrow({
+      where: {
+        kind: 'customer-credentials',
+        payload: { path: ['customerId'], equals: customer.id },
+      },
+    });
     const payload = event.payload as { encryptedPassword: string; issuedAt: string };
     const pass = decrypt(payload.encryptedPassword);
     expect(pass.length).toBeGreaterThanOrEqual(24);
     expect(JSON.stringify(event)).not.toContain(pass);
     vi.mocked(sendEmail).mockClear();
     await deliverCredentials(customer.id, payload.encryptedPassword, payload.issuedAt, event.id);
-    expect(sendEmail).toHaveBeenCalledWith(email, expect.any(String), expect.stringContaining(pass), event.id);
+    expect(sendEmail).toHaveBeenCalledWith(
+      email,
+      expect.any(String),
+      expect.stringContaining(pass),
+      event.id,
+    );
     expect(user.passwordHash).not.toBe(pass);
     expect(await argon2.verify(user.passwordHash, pass)).toBe(true);
     expect(await db.userRole.count({ where: { userId: user.id } })).toBe(0);
@@ -1102,8 +1211,12 @@ describe('private record images and guided form contracts', () => {
     expect((await db.session.findUniqueOrThrow({ where: { id: signedIn.sessionId } })).userId).toBe(
       user.id,
     );
-    expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).firstLoginAt).not.toBeNull();
-    await expect(resendCredentials(context(), customer.id)).rejects.toMatchObject({ code: 'CREDENTIALS_ALREADY_USED' });
+    expect(
+      (await db.user.findUniqueOrThrow({ where: { id: user.id } })).firstLoginAt,
+    ).not.toBeNull();
+    await expect(resendCredentials(context(), customer.id)).rejects.toMatchObject({
+      code: 'CREDENTIALS_ALREADY_USED',
+    });
     vi.mocked(sendEmail).mockClear();
     await deliverCredentials(customer.id, payload.encryptedPassword, payload.issuedAt, event.id);
     expect(sendEmail).not.toHaveBeenCalled();
@@ -1130,9 +1243,18 @@ describe('private record images and guided form contracts', () => {
     expect(
       (await post(path).send({ ...body, email: 'weak@example.invalid', password: 'weak' })).status,
     ).toBe(422);
-    for (const identity of ['123', '35202-123456-1', '35202123456789', 'ABCD123456789']) expect((await post(path).send({ ...body, identity, email: 'invalid-cnic@example.invalid' })).status).toBe(422);
-    expect((await post(path, 'viewer').send({ ...body, email: 'forbidden@example.invalid' })).status).toBe(403);
-    const customer = await post(path, 'creator').send({ ...body, email: 'generated@example.invalid' });
+    for (const identity of ['123', '35202-123456-1', '35202123456789', 'ABCD123456789'])
+      expect(
+        (await post(path).send({ ...body, identity, email: 'invalid-cnic@example.invalid' }))
+          .status,
+      ).toBe(422);
+    expect(
+      (await post(path, 'viewer').send({ ...body, email: 'forbidden@example.invalid' })).status,
+    ).toBe(403);
+    const customer = await post(path, 'creator').send({
+      ...body,
+      email: 'generated@example.invalid',
+    });
     expect(customer.status, customer.text).toBe(201);
     expect(
       (
@@ -1154,23 +1276,43 @@ describe('private record images and guided form contracts', () => {
     expect(response.status, response.text).toBe(201);
     expect(response.body.data.communicationConsent).toBe(false);
     const customerId = response.body.data.id as string;
-    const original = await db.outbox.findFirstOrThrow({ where: { kind: 'customer-credentials', payload: { path: ['customerId'], equals: customerId } } });
+    const original = await db.outbox.findFirstOrThrow({
+      where: {
+        kind: 'customer-credentials',
+        payload: { path: ['customerId'], equals: customerId },
+      },
+    });
     const payload = original.payload as { encryptedPassword: string; issuedAt: string };
     const user = await db.user.findUniqueOrThrow({ where: { email } });
-    await expect(resendCredentials(context(), customerId)).rejects.toMatchObject({ code: 'CREDENTIALS_THROTTLED' });
-    await db.user.update({ where: { id: user.id }, data: { credentialsIssuedAt: new Date(Date.now() - 61000) } });
+    await expect(resendCredentials(context(), customerId)).rejects.toMatchObject({
+      code: 'CREDENTIALS_THROTTLED',
+    });
+    await db.user.update({
+      where: { id: user.id },
+      data: { credentialsIssuedAt: new Date(Date.now() - 61000) },
+    });
     expect(await resendCredentials(context(), customerId)).toEqual({ queued: true, email });
     const refreshed = await db.user.findUniqueOrThrow({ where: { id: user.id } });
-    expect(await argon2.verify(refreshed.passwordHash, decrypt(payload.encryptedPassword))).toBe(false);
+    expect(await argon2.verify(refreshed.passwordHash, decrypt(payload.encryptedPassword))).toBe(
+      false,
+    );
     vi.mocked(sendEmail).mockClear();
     await deliverCredentials(customerId, payload.encryptedPassword, payload.issuedAt, original.id);
     expect(sendEmail).not.toHaveBeenCalled();
-    const replacement = await db.outbox.findFirstOrThrow({ where: { kind: 'customer-credentials', id: { not: original.id }, payload: { path: ['customerId'], equals: customerId } } });
+    const replacement = await db.outbox.findFirstOrThrow({
+      where: {
+        kind: 'customer-credentials',
+        id: { not: original.id },
+        payload: { path: ['customerId'], equals: customerId },
+      },
+    });
     const next = replacement.payload as { encryptedPassword: string; issuedAt: string };
     expect(await argon2.verify(refreshed.passwordHash, decrypt(next.encryptedPassword))).toBe(true);
     await deliverCredentials(customerId, next.encryptedPassword, next.issuedAt, replacement.id);
     expect(sendEmail).toHaveBeenCalledTimes(1);
-    await expect(resendCredentials({ ...context(), projectId: otherProject }, customerId)).rejects.toMatchObject({ status: 404 });
+    await expect(
+      resendCredentials({ ...context(), projectId: otherProject }, customerId),
+    ).rejects.toMatchObject({ status: 404 });
   });
   it('emails account status, access and administrator session changes to the affected user', async () => {
     const user = await db.user.create({
@@ -1203,7 +1345,12 @@ describe('private record images and guided form contracts', () => {
   });
   it('never overwrites or links existing accounts, and rolls back portal creation if the customer fails', async () => {
     const path = `/projects/${projectId}/customers`;
-    const body = { name: 'Existing account', phone: '03001234567', identity: nationalId(), email: 'created-collision@example.invalid' };
+    const body = {
+      name: 'Existing account',
+      phone: '03001234567',
+      identity: nationalId(),
+      email: 'created-collision@example.invalid',
+    };
     const customerAccount = await db.user.create({
       data: {
         name: 'Existing portal customer',
@@ -1252,8 +1399,16 @@ describe('private record images and guided form contracts', () => {
       await expect(
         createPayment(context(), { ...body, method }, randomUUID()),
       ).rejects.toMatchObject({ code: 'PAYMENT_PROOF_REQUIRED' });
-    await expect(createPayment(context(), { ...body, method: 'CHEQUE' }, randomUUID())).rejects.toMatchObject({ code: 'PAYMENT_REFERENCE_REQUIRED' });
-    expect(await createPayment(context(), { ...body, method: 'CHEQUE', transactionReference: 'CH-123' }, randomUUID())).toMatchObject({ status: 'PENDING', proofImageId: null });
+    await expect(
+      createPayment(context(), { ...body, method: 'CHEQUE' }, randomUUID()),
+    ).rejects.toMatchObject({ code: 'PAYMENT_REFERENCE_REQUIRED' });
+    expect(
+      await createPayment(
+        context(),
+        { ...body, method: 'CHEQUE', transactionReference: 'CH-123' },
+        randomUUID(),
+      ),
+    ).toMatchObject({ status: 'PENDING', proofImageId: null });
     const proofImageId = await upload('PAYMENT', projectId);
     await expect(
       createPayment(context(), { ...body, method: 'OTHER', proofImageId }, randomUUID()),

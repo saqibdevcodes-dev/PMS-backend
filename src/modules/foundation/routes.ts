@@ -93,17 +93,22 @@ export const customerBody = z
     communicationConsent: z.boolean().default(false),
   })
   .strict();
-const customerCreateBody = customerBody
-  .extend({ email: z.email() })
-  .superRefine((v, ctx) => {
-    const normalized = v.identity.replace(/[ -]/g, '');
-    if (v.identityType === 'CNIC' ? !/^\d{13}$/.test(normalized) : !/^[A-Za-z0-9]{6,20}$/.test(normalized))
-      ctx.addIssue({
-        code: 'custom',
-        path: ['identity'],
-        message: v.identityType === 'CNIC' ? 'Enter a 13-digit CNIC, for example 35202-1234567-1.' : 'Enter a passport number with 6–20 letters or digits.',
-      });
-  });
+const customerCreateBody = customerBody.extend({ email: z.email() }).superRefine((v, ctx) => {
+  const normalized = v.identity.replace(/[ -]/g, '');
+  if (
+    v.identityType === 'CNIC'
+      ? !/^\d{13}$/.test(normalized)
+      : !/^[A-Za-z0-9]{6,20}$/.test(normalized)
+  )
+    ctx.addIssue({
+      code: 'custom',
+      path: ['identity'],
+      message:
+        v.identityType === 'CNIC'
+          ? 'Enter a 13-digit CNIC, for example 35202-1234567-1.'
+          : 'Enter a passport number with 6–20 letters or digits.',
+    });
+});
 const publicCustomer = {
   id: true,
   projectId: true,
@@ -597,10 +602,26 @@ export function foundationRoutes(app: Express) {
     },
     async (ctx, b) =>
       transaction(async (tx) => {
-        const numbers = b.units.map(unit => unit.number);
-        requireState(new Set(numbers).size === numbers.length, 'DUPLICATE_PROPERTY', 'The import contains duplicate property numbers.', 422);
-        const existing = await tx.unit.findMany({ where: { projectId: ctx.projectId, number: { in: numbers } }, select: { number: true } });
-        requireState(!existing.length, 'PROPERTY_ALREADY_EXISTS', `These property numbers already exist: ${existing.map(unit => unit.number).slice(0, 10).join(', ')}. Bulk import only adds new properties.`, 422);
+        const numbers = b.units.map((unit) => unit.number);
+        requireState(
+          new Set(numbers).size === numbers.length,
+          'DUPLICATE_PROPERTY',
+          'The import contains duplicate property numbers.',
+          422,
+        );
+        const existing = await tx.unit.findMany({
+          where: { projectId: ctx.projectId, number: { in: numbers } },
+          select: { number: true },
+        });
+        requireState(
+          !existing.length,
+          'PROPERTY_ALREADY_EXISTS',
+          `These property numbers already exist: ${existing
+            .map((unit) => unit.number)
+            .slice(0, 10)
+            .join(', ')}. Bulk import only adds new properties.`,
+          422,
+        );
         for (const u of b.units) {
           const gallery = await requireUnitImages(tx, ctx, u);
           const unit = await tx.unit.create({
@@ -671,7 +692,11 @@ export function foundationRoutes(app: Express) {
     async (ctx, body, _q, req) =>
       transaction(async (tx) => {
         const current = await scopedUnit(tx, ctx, id(req));
-        requireState(['AVAILABLE', 'BLOCKED'].includes(current.status), 'UNIT_COMMITTED', 'Booked or sold property cannot be edited. Resolve the booking before changing property details.');
+        requireState(
+          ['AVAILABLE', 'BLOCKED'].includes(current.status),
+          'UNIT_COMMITTED',
+          'Booked or sold property cannot be edited. Resolve the booking before changing property details.',
+        );
         requireState(
           (body.type ?? current.type) !== 'OTHER' ||
             Boolean(body.typeDetails ?? current.typeDetails),
@@ -758,8 +783,7 @@ export function foundationRoutes(app: Express) {
     root + '/customers',
     {
       permission: 'customers.create',
-      summary:
-        'Create a customer and email automatically generated portal login credentials',
+      summary: 'Create a customer and email automatically generated portal login credentials',
       body: customerCreateBody,
       status: 201,
     },

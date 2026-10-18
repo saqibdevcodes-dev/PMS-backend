@@ -136,7 +136,9 @@ export function portalRoutes(app: Express) {
           where: { id: id(req), projectId: ctx.projectId },
           select: {
             email: true,
-            portalUser: { select: { email: true, active: true, credentialsIssuedAt: true, firstLoginAt: true } },
+            portalUser: {
+              select: { email: true, active: true, credentialsIssuedAt: true, firstLoginAt: true },
+            },
             portalInvitations: {
               orderBy: { createdAt: 'desc' },
               take: 1,
@@ -159,7 +161,12 @@ export function portalRoutes(app: Express) {
             ? 'PENDING'
             : 'NOT_ACTIVE',
         expiresAt: invitation?.expiresAt ?? null,
-        canResendCredentials: Boolean(customer.portalUser?.active && customer.portalUser.credentialsIssuedAt && !customer.portalUser.firstLoginAt && customer.portalUser.email === customer.email?.trim().toLowerCase()),
+        canResendCredentials: Boolean(
+          customer.portalUser?.active &&
+          customer.portalUser.credentialsIssuedAt &&
+          !customer.portalUser.firstLoginAt &&
+          customer.portalUser.email === customer.email?.trim().toLowerCase(),
+        ),
       };
     },
   );
@@ -173,9 +180,16 @@ export function portalRoutes(app: Express) {
     },
     async (ctx, _b, _q, req) => inviteCustomer(ctx, id(req)),
   );
-  endpoint(app, 'post', adminRoot + '/resend-credentials', {
-    permission: 'customers.portal.manage', summary: 'Email fresh credentials only to a new customer before their first sign-in',
-  }, async (ctx, _b, _q, req) => resendCredentials(ctx, id(req)));
+  endpoint(
+    app,
+    'post',
+    adminRoot + '/resend-credentials',
+    {
+      permission: 'customers.portal.manage',
+      summary: 'Email fresh credentials only to a new customer before their first sign-in',
+    },
+    async (ctx, _b, _q, req) => resendCredentials(ctx, id(req)),
+  );
   endpoint(
     app,
     'delete',
@@ -370,7 +384,9 @@ export function portalRoutes(app: Express) {
     {
       permission: 'documents.manage',
       summary: 'Explicitly share or withdraw a document from the customer portal',
-      body: z.object({ portalVisible: z.boolean(), allProjectCustomers: z.boolean().optional() }).strict(),
+      body: z
+        .object({ portalVisible: z.boolean(), allProjectCustomers: z.boolean().optional() })
+        .strict(),
     },
     async (ctx, body, _q, req) =>
       transaction(async (tx) => {
@@ -378,7 +394,12 @@ export function portalRoutes(app: Express) {
           await tx.document.findFirst({ where: { id: id(req), projectId: ctx.projectId } }),
         );
         const allProjectCustomers = body.allProjectCustomers ?? doc.allProjectCustomers;
-        requireState(!allProjectCustomers || (!doc.customerId && !doc.bookingId), 'PRIVATE_DOCUMENT_OWNER', 'Customer-specific documents cannot be shared with all customers. Upload a separate general document.', 422);
+        requireState(
+          !allProjectCustomers || (!doc.customerId && !doc.bookingId),
+          'PRIVATE_DOCUMENT_OWNER',
+          'Customer-specific documents cannot be shared with all customers. Upload a separate general document.',
+          422,
+        );
         requireState(
           !body.portalVisible || allProjectCustomers || doc.customerId || doc.bookingId,
           'DOCUMENT_CUSTOMER_REQUIRED',

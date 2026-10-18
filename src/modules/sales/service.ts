@@ -207,58 +207,64 @@ export async function createPayment(
 }
 type PaymentInput = Parameters<typeof createPayment>[1];
 async function createPaymentInTransaction(tx: Tx, ctx: Context, input: PaymentInput) {
-      const booking = await scopedBooking(tx, ctx, input.bookingId);
-      requireState(
-        booking.status !== 'CANCELLED',
-        'BOOKING_CANCELLED',
-        'Payments cannot be received for cancelled bookings.',
-      );
-      const account = found(
-        await tx.account.findFirst({
-          where: {
-            id: input.receivingAccountId ?? (await mappedAccount(tx, ctx.projectId, 'cash')),
-            projectId: ctx.projectId,
-            active: true,
-          },
-        }),
-      );
-      requireState(
-        account.type === 'ASSET',
-        'INVALID_ACCOUNT',
-        'Receiving account must be an asset account.',
-        422,
-      );
-      requireState(
-        new Date(input.paidAt).getTime() <= Date.now() + 60000,
-        'FUTURE_PAYMENT',
-        'Payment date cannot be in the future.',
-        422,
-      );
-      requireState(
-        ['CASH', 'CHEQUE'].includes(input.method) || input.proofImageId,
-        'PAYMENT_PROOF_REQUIRED',
-        'Upload proof for bank transfers and other electronic payments.',
-        422,
-      );
-      requireState(!['CHEQUE', 'BANK_TRANSFER'].includes(input.method) || Boolean(input.transactionReference?.trim()), 'PAYMENT_REFERENCE_REQUIRED', 'Enter the cheque number or bank transaction ID.', 422);
-      requireState(
-        input.method !== 'OTHER' || input.methodDetails?.trim(),
-        'PAYMENT_METHOD_DETAILS_REQUIRED',
-        'Describe how this payment was made.',
-        422,
-      );
-      await requireImage(tx, ctx, input.proofImageId, 'PAYMENT');
-      const payment = await tx.payment.create({
-        data: {
-          ...input,
-          receivingAccountId: account.id,
-          payerId: booking.customerId,
-          paidAt: new Date(input.paidAt),
-          receivedBy: ctx.actor.id,
-        },
-      });
-      await audit(tx, ctx, 'payment.created', payment.id, { amount: input.amount });
-      return payment;
+  const booking = await scopedBooking(tx, ctx, input.bookingId);
+  requireState(
+    booking.status !== 'CANCELLED',
+    'BOOKING_CANCELLED',
+    'Payments cannot be received for cancelled bookings.',
+  );
+  const account = found(
+    await tx.account.findFirst({
+      where: {
+        id: input.receivingAccountId ?? (await mappedAccount(tx, ctx.projectId, 'cash')),
+        projectId: ctx.projectId,
+        active: true,
+      },
+    }),
+  );
+  requireState(
+    account.type === 'ASSET',
+    'INVALID_ACCOUNT',
+    'Receiving account must be an asset account.',
+    422,
+  );
+  requireState(
+    new Date(input.paidAt).getTime() <= Date.now() + 60000,
+    'FUTURE_PAYMENT',
+    'Payment date cannot be in the future.',
+    422,
+  );
+  requireState(
+    ['CASH', 'CHEQUE'].includes(input.method) || input.proofImageId,
+    'PAYMENT_PROOF_REQUIRED',
+    'Upload proof for bank transfers and other electronic payments.',
+    422,
+  );
+  requireState(
+    !['CHEQUE', 'BANK_TRANSFER'].includes(input.method) ||
+      Boolean(input.transactionReference?.trim()),
+    'PAYMENT_REFERENCE_REQUIRED',
+    'Enter the cheque number or bank transaction ID.',
+    422,
+  );
+  requireState(
+    input.method !== 'OTHER' || input.methodDetails?.trim(),
+    'PAYMENT_METHOD_DETAILS_REQUIRED',
+    'Describe how this payment was made.',
+    422,
+  );
+  await requireImage(tx, ctx, input.proofImageId, 'PAYMENT');
+  const payment = await tx.payment.create({
+    data: {
+      ...input,
+      receivingAccountId: account.id,
+      payerId: booking.customerId,
+      paidAt: new Date(input.paidAt),
+      receivedBy: ctx.actor.id,
+    },
+  });
+  await audit(tx, ctx, 'payment.created', payment.id, { amount: input.amount });
+  return payment;
 }
 export async function verifyPayment(
   ctx: Context,
@@ -268,122 +274,192 @@ export async function verifyPayment(
   key: string,
 ) {
   return transaction(async (tx) =>
-    idempotent(tx, ctx, 'payment.verify', key, { paymentId, decision, reason }, () => verifyPaymentInTransaction(tx, ctx, paymentId, decision, reason)),
+    idempotent(tx, ctx, 'payment.verify', key, { paymentId, decision, reason }, () =>
+      verifyPaymentInTransaction(tx, ctx, paymentId, decision, reason),
+    ),
   );
 }
-async function verifyPaymentInTransaction(tx: Tx, ctx: Context, paymentId: string, decision: 'CLEARED' | 'REJECTED' | 'BOUNCED', reason: string, approveNewCash = false) {
-      const initial = found(
-        await tx.payment.findFirst({
-          where: { id: paymentId, booking: { unit: { projectId: ctx.projectId } } },
+async function verifyPaymentInTransaction(
+  tx: Tx,
+  ctx: Context,
+  paymentId: string,
+  decision: 'CLEARED' | 'REJECTED' | 'BOUNCED',
+  reason: string,
+  approveNewCash = false,
+) {
+  const initial = found(
+    await tx.payment.findFirst({
+      where: { id: paymentId, booking: { unit: { projectId: ctx.projectId } } },
+    }),
+  );
+  const booking = await scopedBooking(tx, ctx, initial.bookingId);
+  await lock(tx, 'Payment', paymentId);
+  const payment = found(await tx.payment.findUnique({ where: { id: paymentId } }));
+  requireState(
+    payment.status === 'PENDING',
+    'PAYMENT_ALREADY_PROCESSED',
+    'This payment has already been processed.',
+  );
+  requireState(
+    payment.receivedBy !== ctx.actor.id ||
+      ctx.actor.isSuperAdmin ||
+      (approveNewCash && ctx.actor.permissions.has('payments.verify')),
+    'SELF_VERIFICATION_FORBIDDEN',
+    'A different user must verify this payment.',
+    403,
+  );
+  requireState(booking.status !== 'CANCELLED', 'BOOKING_CANCELLED', 'The booking is cancelled.');
+  if (decision === 'BOUNCED')
+    requireState(
+      payment.method === 'CHEQUE',
+      'INVALID_PAYMENT_TRANSITION',
+      'Only cheques can bounce.',
+      422,
+    );
+  if (decision === 'CLEARED') {
+    let remaining = payment.amount;
+    const installments = await tx.installment.findMany({
+      where: { bookingId: booking.id, superseded: false },
+      include: { allocations: { where: { reversedAt: null } } },
+      orderBy: [{ dueDate: 'asc' }, { sequence: 'asc' }],
+    });
+    for (const installment of installments) {
+      const due = installment.amount.minus(sum(installment.allocations.map((a) => a.amount)));
+      const amount = Prisma.Decimal.min(due, remaining);
+      if (amount.gt(0)) {
+        await tx.paymentAllocation.create({
+          data: { paymentId: payment.id, installmentId: installment.id, amount },
+        });
+        remaining = remaining.minus(amount);
+      }
+      if (remaining.eq(0)) break;
+    }
+    await tx.receipt.create({
+      data: { paymentId: payment.id, reference: await reference(tx, 'RCT') },
+    });
+    await postJournal(tx, ctx, {
+      source: 'PAYMENT',
+      sourceId: payment.id,
+      description: 'Verified collection',
+      lines: [
+        { accountId: payment.receivingAccountId, debit: payment.amount, credit: 0 },
+        {
+          accountId: await mappedAccount(tx, ctx.projectId, 'advances'),
+          debit: 0,
+          credit: payment.amount,
+        },
+      ],
+    });
+    await outbox(tx, 'business-event', {
+      projectId: ctx.projectId,
+      kind: 'Payment receipt',
+      entityId: payment.id,
+    });
+  }
+  await tx.paymentVerification.create({
+    data: { paymentId: payment.id, actorId: ctx.actor.id, status: decision, reason },
+  });
+  const result = await tx.payment.update({
+    where: { id: payment.id },
+    data: { status: decision, verifiedAt: new Date(), verifiedBy: ctx.actor.id },
+    include: {
+      receipt: true,
+      allocations: {
+        orderBy: [
+          { installment: { dueDate: 'asc' } },
+          { installment: { sequence: 'asc' } },
+          { installmentId: 'asc' },
+        ],
+      },
+    },
+  });
+  await audit(tx, ctx, 'payment.verified', payment.id, { decision });
+  return result;
+}
+export async function collectInstallment(
+  ctx: Context,
+  installmentId: string,
+  input: {
+    expectedAmount: string;
+    method: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER';
+    paidAt: string;
+    transactionReference?: string;
+    proofImageId?: string;
+    receivingAccountId?: string;
+  },
+  key: string,
+) {
+  requireState(
+    ctx.actor.permissions.has('payments.create'),
+    'FORBIDDEN',
+    'Payment recording permission is required.',
+    403,
+  );
+  requireState(
+    input.method !== 'BANK_TRANSFER' || Boolean(input.receivingAccountId),
+    'BANK_ACCOUNT_REQUIRED',
+    'Select the receiving bank account.',
+    422,
+  );
+  if (input.method === 'CASH')
+    requireState(
+      ctx.actor.permissions.has('payments.verify'),
+      'FORBIDDEN',
+      'Payment verification permission is required to receive and approve cash.',
+      403,
+    );
+  return transaction((tx) =>
+    idempotent(tx, ctx, 'installment.collect', key, { installmentId, ...input }, async () => {
+      const installment = found(
+        await tx.installment.findFirst({
+          where: { id: installmentId, booking: { unit: { projectId: ctx.projectId } } },
         }),
       );
-      const booking = await scopedBooking(tx, ctx, initial.bookingId);
-      await lock(tx, 'Payment', paymentId);
-      const payment = found(await tx.payment.findUnique({ where: { id: paymentId } }));
+      const booking = await scopedBooking(tx, ctx, installment.bookingId);
       requireState(
-        payment.status === 'PENDING',
-        'PAYMENT_ALREADY_PROCESSED',
-        'This payment has already been processed.',
+        booking.status === 'CONFIRMED',
+        'BOOKING_NOT_CONFIRMED',
+        'Confirm the booking before receiving an installment.',
+      );
+      const position = await bookingPosition(tx, booking.id);
+      const next = position.installments.find((item) => decimal(item.outstanding).gt(0));
+      requireState(
+        next?.id === installmentId && !installment.superseded,
+        'INSTALLMENT_NOT_NEXT',
+        'Refresh the schedule and select the earliest unpaid installment.',
       );
       requireState(
-        payment.receivedBy !== ctx.actor.id || ctx.actor.isSuperAdmin || (approveNewCash && ctx.actor.permissions.has('payments.verify')),
-        'SELF_VERIFICATION_FORBIDDEN',
-        'A different user must verify this payment.',
-        403,
+        decimal(next.outstanding).eq(input.expectedAmount),
+        'INSTALLMENT_AMOUNT_CHANGED',
+        'The outstanding amount changed. Refresh the schedule before recording payment.',
       );
       requireState(
-        booking.status !== 'CANCELLED',
-        'BOOKING_CANCELLED',
-        'The booking is cancelled.',
+        !(await tx.payment.findFirst({ where: { bookingId: booking.id, status: 'PENDING' } })),
+        'PAYMENT_PENDING',
+        'This booking already has a pending payment. Verify or reject it from Payments received before adding another installment.',
       );
-      if (decision === 'BOUNCED')
-        requireState(
-          payment.method === 'CHEQUE',
-          'INVALID_PAYMENT_TRANSITION',
-          'Only cheques can bounce.',
-          422,
-        );
-      if (decision === 'CLEARED') {
-        let remaining = payment.amount;
-        const installments = await tx.installment.findMany({
-          where: { bookingId: booking.id, superseded: false },
-          include: { allocations: { where: { reversedAt: null } } },
-          orderBy: [{ dueDate: 'asc' }, { sequence: 'asc' }],
-        });
-        for (const installment of installments) {
-          const due = installment.amount.minus(sum(installment.allocations.map((a) => a.amount)));
-          const amount = Prisma.Decimal.min(due, remaining);
-          if (amount.gt(0)) {
-            await tx.paymentAllocation.create({
-              data: { paymentId: payment.id, installmentId: installment.id, amount },
-            });
-            remaining = remaining.minus(amount);
-          }
-          if (remaining.eq(0)) break;
-        }
-        await tx.receipt.create({
-          data: { paymentId: payment.id, reference: await reference(tx, 'RCT') },
-        });
-        await postJournal(tx, ctx, {
-          source: 'PAYMENT',
-          sourceId: payment.id,
-          description: 'Verified collection',
-          lines: [
-            { accountId: payment.receivingAccountId, debit: payment.amount, credit: 0 },
-            {
-              accountId: await mappedAccount(tx, ctx.projectId, 'advances'),
-              debit: 0,
-              credit: payment.amount,
-            },
-          ],
-        });
-        await outbox(tx, 'business-event', {
-          projectId: ctx.projectId,
-          kind: 'Payment receipt',
-          entityId: payment.id,
-        });
-      }
-      await tx.paymentVerification.create({
-        data: { paymentId: payment.id, actorId: ctx.actor.id, status: decision, reason },
+      const { expectedAmount: _amount, ...fields } = input;
+      const payment = await createPaymentInTransaction(tx, ctx, {
+        ...fields,
+        bookingId: booking.id,
+        amount: next.outstanding,
       });
-      const result = await tx.payment.update({
-        where: { id: payment.id },
-        data: { status: decision, verifiedAt: new Date(), verifiedBy: ctx.actor.id },
-        include: {
-          receipt: true,
-          allocations: {
-            orderBy: [
-              { installment: { dueDate: 'asc' } },
-              { installment: { sequence: 'asc' } },
-              { installmentId: 'asc' },
-            ],
-          },
-        },
+      await audit(tx, ctx, 'installment.payment_recorded', installmentId, {
+        paymentId: payment.id,
       });
-      await audit(tx, ctx, 'payment.verified', payment.id, { decision });
-      return result;
-}
-export async function collectInstallment(ctx: Context, installmentId: string,
-  input: { expectedAmount: string; method: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER'; paidAt: string; transactionReference?: string; proofImageId?: string; receivingAccountId?: string }, key: string) {
-  requireState(ctx.actor.permissions.has('payments.create'), 'FORBIDDEN', 'Payment recording permission is required.', 403);
-  requireState(input.method !== 'BANK_TRANSFER' || Boolean(input.receivingAccountId), 'BANK_ACCOUNT_REQUIRED', 'Select the receiving bank account.', 422);
-  if (input.method === 'CASH') requireState(ctx.actor.permissions.has('payments.verify'), 'FORBIDDEN', 'Payment verification permission is required to receive and approve cash.', 403);
-  return transaction(tx => idempotent(tx, ctx, 'installment.collect', key, { installmentId, ...input }, async () => {
-    const installment = found(await tx.installment.findFirst({ where: { id: installmentId, booking: { unit: { projectId: ctx.projectId } } } }));
-    const booking = await scopedBooking(tx, ctx, installment.bookingId);
-    requireState(booking.status === 'CONFIRMED', 'BOOKING_NOT_CONFIRMED', 'Confirm the booking before receiving an installment.');
-    const position = await bookingPosition(tx, booking.id);
-    const next = position.installments.find(item => decimal(item.outstanding).gt(0));
-    requireState(next?.id === installmentId && !installment.superseded, 'INSTALLMENT_NOT_NEXT', 'Refresh the schedule and select the earliest unpaid installment.');
-    requireState(decimal(next.outstanding).eq(input.expectedAmount), 'INSTALLMENT_AMOUNT_CHANGED', 'The outstanding amount changed. Refresh the schedule before recording payment.');
-    requireState(!(await tx.payment.findFirst({ where: { bookingId: booking.id, status: 'PENDING' } })), 'PAYMENT_PENDING', 'This booking already has a pending payment. Verify or reject it from Payments received before adding another installment.');
-    const { expectedAmount: _amount, ...fields } = input;
-    const payment = await createPaymentInTransaction(tx, ctx, { ...fields, bookingId: booking.id, amount: next.outstanding });
-    await audit(tx, ctx, 'installment.payment_recorded', installmentId, { paymentId: payment.id });
-    return (input.method === 'CASH' && ctx.actor.permissions.has('payments.verify')) || ctx.actor.isSuperAdmin
-      ? verifyPaymentInTransaction(tx, ctx, payment.id, 'CLEARED', 'Approved on recording by administrator', true)
-      : payment;
-  }));
+      return (input.method === 'CASH' && ctx.actor.permissions.has('payments.verify')) ||
+        ctx.actor.isSuperAdmin
+        ? verifyPaymentInTransaction(
+            tx,
+            ctx,
+            payment.id,
+            'CLEARED',
+            'Approved on recording by administrator',
+            true,
+          )
+        : payment;
+    }),
+  );
 }
 export async function reversePayment(ctx: Context, paymentId: string, reason: string) {
   return transaction(async (tx) => {

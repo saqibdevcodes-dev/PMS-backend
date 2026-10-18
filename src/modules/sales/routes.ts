@@ -19,10 +19,27 @@ import * as sales from './service.js';
 import { bookingInput, paymentTerms } from './payment-plan.js';
 const root = '/projects/:projectId';
 export function salesRoutes(app: Express) {
-  endpoint(app, 'post', root + '/installments/:id/payment', {
-    permission: 'payments.create', summary: 'Receive the next installment; approve cash or queue bank/cheque verification; requires Idempotency-Key',
-    body: z.object({ expectedAmount: positiveMoney, method: z.enum(['CASH','CHEQUE','BANK_TRANSFER']), paidAt: z.iso.datetime(), transactionReference: z.string().trim().min(1).max(200).optional(), proofImageId: uuid.optional(), receivingAccountId: uuid.optional() }).strict(),
-  }, async (ctx, body, _q, req) => sales.collectInstallment(ctx, id(req), body, idempotencyKey(req)));
+  endpoint(
+    app,
+    'post',
+    root + '/installments/:id/payment',
+    {
+      permission: 'payments.create',
+      summary:
+        'Receive the next installment; approve cash or queue bank/cheque verification; requires Idempotency-Key',
+      body: z
+        .object({
+          expectedAmount: positiveMoney,
+          method: z.enum(['CASH', 'CHEQUE', 'BANK_TRANSFER']),
+          paidAt: z.iso.datetime(),
+          transactionReference: z.string().trim().min(1).max(200).optional(),
+          proofImageId: uuid.optional(),
+          receivingAccountId: uuid.optional(),
+        })
+        .strict(),
+    },
+    async (ctx, body, _q, req) => sales.collectInstallment(ctx, id(req), body, idempotencyKey(req)),
+  );
   endpoint(
     app,
     'post',
@@ -138,20 +155,53 @@ export function salesRoutes(app: Express) {
           where,
           include: {
             customer: { select: { id: true, name: true, phone: true } },
-            unit: { select: { id: true, number: true, type: true, size: true, measurementUnit: true, phase: true, block: true } },
-            payments: { where: { status: { in: ['CLEARED', 'PENDING'] } }, select: { amount: true, status: true } },
-            installments: { where: { superseded: false }, orderBy: [{ dueDate: 'asc' }, { sequence: 'asc' }], select: { amount: true, dueDate: true, allocations: { where: { reversedAt: null }, select: { amount: true } } } },
+            unit: {
+              select: {
+                id: true,
+                number: true,
+                type: true,
+                size: true,
+                measurementUnit: true,
+                phase: true,
+                block: true,
+              },
+            },
+            payments: {
+              where: { status: { in: ['CLEARED', 'PENDING'] } },
+              select: { amount: true, status: true },
+            },
+            installments: {
+              where: { superseded: false },
+              orderBy: [{ dueDate: 'asc' }, { sequence: 'asc' }],
+              select: {
+                amount: true,
+                dueDate: true,
+                allocations: { where: { reversedAt: null }, select: { amount: true } },
+              },
+            },
           },
           ...pagination(q),
           orderBy: { createdAt: q.sort },
         }),
         db.booking.count({ where }),
       ]);
-      return paged(items.map(({ payments, installments, ...booking }) => {
-        const paid = sum(payments.filter(p => p.status === 'CLEARED').map(p => p.amount));
-        const next = installments.find(i => i.amount.gt(sum(i.allocations.map(a => a.amount))));
-        return { ...booking, paid: paid.toFixed(2), outstanding: decimal(booking.total).minus(paid).clamp(0, booking.total).toFixed(2), pendingPayments: payments.filter(p => p.status === 'PENDING').length, nextDue: next?.dueDate ?? null };
-      }), total, q);
+      return paged(
+        items.map(({ payments, installments, ...booking }) => {
+          const paid = sum(payments.filter((p) => p.status === 'CLEARED').map((p) => p.amount));
+          const next = installments.find((i) =>
+            i.amount.gt(sum(i.allocations.map((a) => a.amount))),
+          );
+          return {
+            ...booking,
+            paid: paid.toFixed(2),
+            outstanding: decimal(booking.total).minus(paid).clamp(0, booking.total).toFixed(2),
+            pendingPayments: payments.filter((p) => p.status === 'PENDING').length,
+            nextDue: next?.dueDate ?? null,
+          };
+        }),
+        total,
+        q,
+      );
     },
   );
   endpoint(

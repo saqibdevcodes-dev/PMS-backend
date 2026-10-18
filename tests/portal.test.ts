@@ -633,20 +633,58 @@ describe('customer portal with real Prisma queries and embedded PostgreSQL', () 
     expect((await get('/portal/documents/' + shared.id + '/download')).status).toBe(404);
   });
   it('shares project documents with linked customers only and supports withdrawing access', async () => {
-    const another = await db.project.create({ data: { code: 'FOREIGN-DOCS', name: 'Other project' } });
-    const base = { name: 'Project policy.pdf', mime: 'application/pdf', size: 42, sha256: 'test', uploadedBy: staff, portalVisible: true, allProjectCustomers: true };
+    const another = await db.project.create({
+      data: { code: 'FOREIGN-DOCS', name: 'Other project' },
+    });
+    const base = {
+      name: 'Project policy.pdf',
+      mime: 'application/pdf',
+      size: 42,
+      sha256: 'test',
+      uploadedBy: staff,
+      portalVisible: true,
+      allProjectCustomers: true,
+    };
     const shared = await db.document.create({ data: { ...base, projectId, key: randomUUID() } });
-    const foreign = await db.document.create({ data: { ...base, projectId: another.id, key: randomUUID() } });
+    const foreign = await db.document.create({
+      data: { ...base, projectId: another.id, key: randomUUID() },
+    });
     for (const token of [tokenA, tokenB]) {
       const result = await get('/portal/documents', token);
-      expect(result.body.data.items).toContainEqual(expect.objectContaining({ id: shared.id, allProjectCustomers: true }));
-      expect(result.body.data.items).not.toContainEqual(expect.objectContaining({ id: foreign.id }));
+      expect(result.body.data.items).toContainEqual(
+        expect.objectContaining({ id: shared.id, allProjectCustomers: true }),
+      );
+      expect(result.body.data.items).not.toContainEqual(
+        expect.objectContaining({ id: foreign.id }),
+      );
       expect((await get('/portal/documents/' + shared.id + '/download', token)).status).toBe(200);
       expect((await get('/portal/documents/' + foreign.id + '/download', token)).status).toBe(404);
     }
-    const privateDoc = await db.document.create({ data: { ...base, allProjectCustomers: false, projectId, customerId: customerA, key: randomUUID() } });
-    expect((await request(app).patch(`/api/v1/projects/${projectId}/documents/${privateDoc.id}/portal-visibility`).set('Authorization', 'Bearer ' + staffToken).send({ portalVisible: true, allProjectCustomers: true })).status).toBe(422);
-    expect((await request(app).patch(`/api/v1/projects/${projectId}/documents/${shared.id}/portal-visibility`).set('Authorization', 'Bearer ' + staffToken).send({ portalVisible: false })).status).toBe(200);
+    const privateDoc = await db.document.create({
+      data: {
+        ...base,
+        allProjectCustomers: false,
+        projectId,
+        customerId: customerA,
+        key: randomUUID(),
+      },
+    });
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/projects/${projectId}/documents/${privateDoc.id}/portal-visibility`)
+          .set('Authorization', 'Bearer ' + staffToken)
+          .send({ portalVisible: true, allProjectCustomers: true })
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/projects/${projectId}/documents/${shared.id}/portal-visibility`)
+          .set('Authorization', 'Bearer ' + staffToken)
+          .send({ portalVisible: false })
+      ).status,
+    ).toBe(200);
     expect((await get('/portal/documents/' + shared.id + '/download')).status).toBe(404);
   });
   it('produces a PDF statement only for an accessible booking', async () => {

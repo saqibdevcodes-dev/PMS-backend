@@ -39,7 +39,9 @@ const worker = new Worker(
         event.id,
       );
     } else if (event.kind === 'customer-credentials') {
-      const input = z.object({ customerId: z.uuid(), encryptedPassword: z.string(), issuedAt: z.string() }).parse(event.payload);
+      const input = z
+        .object({ customerId: z.uuid(), encryptedPassword: z.string(), issuedAt: z.string() })
+        .parse(event.payload);
       await deliverCredentials(input.customerId, input.encryptedPassword, input.issuedAt, event.id);
     } else if (event.kind === 'customer-invitation') {
       const input = z
@@ -54,7 +56,13 @@ const worker = new Worker(
     } else if (event.kind === 'business-event') {
       await businessEvent(event);
     } else throw new Error('Unrecognized outbox event');
-    await db.outbox.update({ where: { id: event.id }, data: { processedAt: new Date(), ...(event.kind === 'customer-credentials' ? { payload: { completed: true } } : {}) } });
+    await db.outbox.update({
+      where: { id: event.id },
+      data: {
+        processedAt: new Date(),
+        ...(event.kind === 'customer-credentials' ? { payload: { completed: true } } : {}),
+      },
+    });
   },
   { connection, concurrency: 4 },
 );
