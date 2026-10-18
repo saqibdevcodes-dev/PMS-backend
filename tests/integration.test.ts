@@ -66,9 +66,16 @@ async function login(email: string) {
   );
 }
 async function customer(name: string) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cnicDigits = String(Math.floor(10000000 + Math.random() * 90000000));
   return post<{ id: string }>(
     root() + '/customers',
-    { name, phone: '03001234567', identity: `T-${randomUUID()}` },
+    {
+      name,
+      phone: '03001234567',
+      email: `${slug}-${randomUUID()}@example.invalid`,
+      identity: `35202${cnicDigits}`,
+    },
     tokenA,
     201,
   );
@@ -105,8 +112,14 @@ async function draft(price = '1000.00') {
   );
   return { ...result, unit: u };
 }
-async function payment(bookingId: string, amount: string, method = 'CASH') {
-  const proofImageId = method === 'CASH' ? undefined : await recordImage('PAYMENT');
+async function payment(
+  bookingId: string,
+  amount: string,
+  method = 'CASH',
+  transactionReference = method === 'CASH' ? undefined : `REF-${randomUUID().slice(0, 8)}`,
+) {
+  const proofImageId =
+    method === 'CASH' || method === 'CHEQUE' ? undefined : await recordImage('PAYMENT');
   return data<{ id: string }>(
     await auth(api.post(root() + '/payments'))
       .set('Idempotency-Key', randomUUID())
@@ -114,6 +127,7 @@ async function payment(bookingId: string, amount: string, method = 'CASH') {
         bookingId,
         amount,
         method,
+        transactionReference,
         proofImageId,
         paidAt: new Date().toISOString(),
         receivingAccountId: cashId,
@@ -329,7 +343,12 @@ describe('inventory, booking and collections', () => {
     expect(other).toBeNull();
     const outside = await post<{ id: string }>(
       `/api/v1/projects/${otherProjectId}/customers`,
-      { name: 'Other customer', phone: '03001111111', identity: 'OTHER-IDENTITY-1' },
+      {
+        name: 'Other customer',
+        phone: '03001111111',
+        email: `other-${randomUUID()}@example.invalid`,
+        identity: `35202${String(Math.floor(10000000 + Math.random() * 90000000))}`,
+      },
       tokenA,
       201,
     );
