@@ -14,6 +14,7 @@ COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --from=build --chown=node:node /app/prisma.config.ts ./
+COPY --from=build --chown=node:node /app/assets ./assets
 RUN mkdir -p /app/uploads && chown node:node /app/uploads
 USER node
 EXPOSE 4000

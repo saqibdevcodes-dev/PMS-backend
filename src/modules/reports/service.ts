@@ -7,6 +7,7 @@ import { decimal, sum } from '../../common/money.js';
 import { found, requireState } from '../../common/errors.js';
 import { json, outbox, audit } from '../../common/operations.js';
 import { redis } from '../../integrations/redis.js';
+import { customerStatementReport } from './customer-statement.js';
 export const reportKinds = [
   'sales',
   'inventory',
@@ -15,7 +16,6 @@ export const reportKinds = [
   'outstanding',
   'ageing',
   'customer-statement',
-  'dealers',
   'cancellations',
   'refunds',
   'ndcs',
@@ -117,48 +117,8 @@ async function queryReport(
           orderBy: { paidAt: 'desc' },
         })
       ).map(flat);
-    case 'customer-statement': {
-      requireState(
-        q.customerId,
-        'CUSTOMER_REQUIRED',
-        'Customer statement requires customerId.',
-        422,
-      );
-      found(await tx.customer.findFirst({ where: { id: q.customerId, projectId } }));
-      const bookings = await tx.booking.findMany({
-        where: bookingWhere,
-        select: { id: true, reference: true, total: true, status: true },
-        take,
-      });
-      const payments = await tx.payment.findMany({
-        where: {
-          booking: { unit },
-          payerId: q.customerId,
-          status: { in: ['CLEARED', 'REVERSED'] },
-          paidAt: dates,
-        },
-        include: { receipt: true },
-        take,
-        orderBy: { paidAt: 'asc' },
-      });
-      return [
-        ...bookings.map((b) => ({
-          kind: 'BOOKING',
-          reference: b.reference,
-          bookingId: b.id,
-          amount: b.total.toFixed(2),
-          status: b.status,
-        })),
-        ...payments.map((p) => ({
-          kind: 'PAYMENT',
-          reference: p.receipt?.reference ?? '',
-          bookingId: p.bookingId,
-          amount: p.amount.toFixed(2),
-          status: p.status,
-          date: p.paidAt.toISOString(),
-        })),
-      ];
-    }
+    case 'customer-statement':
+      return (await customerStatementReport(tx, projectId, q, limit)).rows;
     case 'installments':
     case 'outstanding':
     case 'ageing': {
@@ -198,10 +158,7 @@ async function queryReport(
         .map((r) => {
           const paid = sum(r.allocations.map((a) => a.amount));
           const due = r.amount.minus(paid);
-          const lateDays = Math.max(
-            0,
-            Math.floor((now - r.dueDate.getTime()) / 86400000) - project.graceDays,
-          );
+          const lateDays = Math.max(0, Math.floor((now - r.dueDate.getTime()) / 86400000));
           const bucket =
             lateDays === 0
               ? 'CURRENT'
@@ -226,20 +183,26 @@ async function queryReport(
             (decimal(r.outstanding).gt(0) && (q.kind !== 'ageing' || r.lateDays > 0)),
         );
     }
-    case 'dealers':
-      return (
-        await tx.dealerCommission.findMany({
-          where: { dealer: { projectId }, booking: bookingWhere },
-          include: { dealer: { select: { name: true } } },
-          take,
-        })
-      ).map((r) => ({ ...flat(r), dealerName: r.dealer.name }));
     case 'cancellations':
       return (await tx.cancellation.findMany({ where: { booking: bookingWhere }, take })).map(flat);
     case 'refunds':
       return (
-        await tx.refund.findMany({ where: { cancellation: { booking: bookingWhere } }, take })
-      ).map(flat);
+        await tx.refund.findMany({
+          where: { cancellation: { booking: bookingWhere } },
+          include: {
+            cancellation: {
+              select: {
+                booking: { select: { reference: true, customer: { select: { name: true } } } },
+              },
+            },
+          },
+          take,
+        })
+      ).map((r) => ({
+        ...flat(r),
+        bookingReference: r.cancellation.booking.reference,
+        customerName: r.cancellation.booking.customer.name,
+      }));
     case 'ndcs':
       return (await tx.ndc.findMany({ where: { booking: bookingWhere }, take })).map(flat);
     case 'transfers':
@@ -334,6 +297,8 @@ async function queryReport(
   }
 }
 export async function report(projectId: string, q: ReportQuery, limit = 1000) {
+  if (q.kind === 'customer-statement')
+    return transaction((tx) => customerStatementReport(tx, projectId, q, limit));
   const rows = await transaction((tx) => queryReport(tx, projectId, q, limit));
   requireState(
     rows.length <= limit,
@@ -410,7 +375,6 @@ export async function dashboard(projectId: string, phase?: string) {
     const defaulters = new Set(
       dueRows.filter((r) => decimal(String(r.overdue)).gt(0)).map((r) => r.customerId),
     ).size;
-    const pendingApprovals = await tx.approval.count({ where: { projectId, status: 'PENDING' } });
     const upcoming = dueRows.filter(
       (r) => r.lateDays === 0 && decimal(String(r.outstanding)).gt(0),
     );
@@ -426,7 +390,6 @@ export async function dashboard(projectId: string, phase?: string) {
       outstanding: outstanding.toFixed(2),
       overdue: overdue.toFixed(2),
       defaulterCount: defaulters,
-      pendingApprovals,
       upcomingInstallments: upcoming.length,
     };
   });

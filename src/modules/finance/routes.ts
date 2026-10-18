@@ -12,11 +12,10 @@ import {
   paged,
   pagination,
 } from '../../common/http.js';
-import { money, sum } from '../../common/money.js';
+import { money } from '../../common/money.js';
 import { found, requireState } from '../../common/errors.js';
-import { audit, json } from '../../common/operations.js';
+import { audit } from '../../common/operations.js';
 import { postJournal, reverseJournal } from './service.js';
-import { requestApproval, consume } from '../approvals/service.js';
 const root = '/projects/:projectId';
 const journalBody = z
   .object({
@@ -131,51 +130,17 @@ export function financeRoutes(app: Express) {
   endpoint(
     app,
     'post',
-    root + '/journals/requests',
+    root + '/journals',
     {
       permission: 'finance.post',
-      summary: 'Request approval of a manual balanced journal',
+      summary: 'Post manual journal; immutable after posting',
       body: journalBody,
     },
     async (ctx, b) =>
       transaction(async (tx) => {
-        requireState(
-          sum(b.lines.map((l) => l.debit)).eq(sum(b.lines.map((l) => l.credit))),
-          'UNBALANCED_JOURNAL',
-          'Debits and credits must balance.',
-          422,
-        );
-        return requestApproval(
-          tx,
-          ctx,
-          'JOURNAL',
-          randomUUID(),
-          sum(b.lines.map((l) => l.debit)).toFixed(2),
-          b,
-        );
-      }),
-  );
-  endpoint(
-    app,
-    'post',
-    root + '/journals',
-    {
-      permission: 'finance.post',
-      summary: 'Post approved manual journal; immutable after posting',
-      body: journalBody.extend({ approvalId: uuid }),
-    },
-    async (ctx, b) =>
-      transaction(async (tx) => {
-        const approval = found(
-          await tx.approval.findFirst({
-            where: { id: b.approvalId, projectId: ctx.projectId, operation: 'JOURNAL' },
-          }),
-        );
-        const { approvalId, ...payload } = b;
-        await consume(tx, ctx, approvalId, 'JOURNAL', approval.entityId, payload);
         return postJournal(tx, ctx, {
           source: 'MANUAL',
-          sourceId: approval.entityId,
+          sourceId: randomUUID(),
           description: b.description,
           postedAt: new Date(b.postedAt),
           lines: b.lines,
@@ -221,58 +186,6 @@ export function financeRoutes(app: Express) {
           'Operational journals must be reversed through their business workflow.',
         );
         return reverseJournal(tx, ctx, journal.id, b.reason);
-      }),
-  );
-  endpoint(
-    app,
-    'get',
-    root + '/settings',
-    { permission: 'settings.manage', summary: 'Read project configuration' },
-    async (ctx) => db.projectSetting.findMany({ where: { projectId: ctx.projectId } }),
-  );
-  endpoint(
-    app,
-    'post',
-    root + '/settings/accounting',
-    {
-      permission: 'settings.manage',
-      summary: 'Configure account mappings for operational events',
-      body: z
-        .object({
-          cash: uuid,
-          advances: uuid,
-          dealerPayable: uuid,
-          deductions: uuid,
-          transferRevenue: uuid,
-          commissionExpense: uuid,
-          dealerRecoverable: uuid,
-        })
-        .strict(),
-    },
-    async (ctx, b) =>
-      transaction(async (tx) => {
-        const expected = {
-          cash: 'ASSET',
-          advances: 'LIABILITY',
-          dealerPayable: 'LIABILITY',
-          deductions: 'REVENUE',
-          transferRevenue: 'REVENUE',
-          commissionExpense: 'EXPENSE',
-          dealerRecoverable: 'ASSET',
-        } as const;
-        for (const key of Object.keys(expected) as (keyof typeof expected)[])
-          found(
-            await tx.account.findFirst({
-              where: { id: b[key], projectId: ctx.projectId, active: true, type: expected[key] },
-            }),
-          );
-        const result = await tx.projectSetting.upsert({
-          where: { projectId_key: { projectId: ctx.projectId, key: 'accounting' } },
-          create: { projectId: ctx.projectId, key: 'accounting', value: json(b) },
-          update: { value: json(b) },
-        });
-        await audit(tx, ctx, 'accounting.mapping_changed', ctx.projectId, b);
-        return result;
       }),
   );
   endpoint(

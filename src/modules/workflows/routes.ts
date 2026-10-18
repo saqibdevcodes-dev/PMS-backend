@@ -2,158 +2,29 @@ import type { Express } from 'express';
 import { z } from 'zod';
 import { WorkflowStatus } from '@prisma/client';
 import { db, transaction, lock } from '../../database/client.js';
-import {
-  endpoint,
-  uuid,
-  id,
-  pageQuery,
-  paginationQuery,
-  paged,
-  pagination,
-} from '../../common/http.js';
+import { endpoint, uuid, id, paginationQuery, paged, pagination } from '../../common/http.js';
 import { money, positiveMoney } from '../../common/money.js';
 import { found, requireState } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
-import { permissions } from '../../common/permissions.js';
-import {
-  decide,
-  approvalPermissions,
-  requestApproval,
-  type Operation,
-} from '../approvals/service.js';
 import { scopedBooking, clearedTotal } from '../sales/service.js';
 import { decimal } from '../../common/money.js';
 import * as workflows from './service.js';
+import {
+  transferVerification,
+  possessionVerification,
+  verificationRecord,
+  handoverAcknowledgement,
+} from './verification.js';
 const root = '/projects/:projectId';
-const approved = z.object({ approvalId: uuid }).strict();
+const directAction = z.object({}).strict();
 const workflowQuery = paginationQuery.extend({
   status: z.enum(WorkflowStatus).optional(),
   bookingId: uuid.optional(),
 });
 const settlement = z
-  .object({ approvalId: uuid, accountId: uuid, paymentReference: z.string().min(3).max(200) })
+  .object({ accountId: uuid, paymentReference: z.string().min(3).max(200) })
   .strict();
 export function workflowRoutes(app: Express) {
-  endpoint(
-    app,
-    'get',
-    root + '/approvals',
-    {
-      permission: 'approvals.read',
-      summary: 'List approval requests with action history',
-      query: pageQuery,
-    },
-    async (ctx, _b, q) => {
-      const where = { projectId: ctx.projectId };
-      const [items, total] = await Promise.all([
-        db.approval.findMany({
-          where,
-          ...pagination(q),
-          include: { actions: true },
-          orderBy: { createdAt: q.sort },
-        }),
-        db.approval.count({ where }),
-      ]);
-      return paged(items, total, q);
-    },
-  );
-  endpoint(
-    app,
-    'post',
-    root + '/approvals/:id/decide',
-    {
-      summary: 'Act on current approval level; designated permission required',
-      body: z
-        .object({ decision: z.enum(['APPROVE', 'REJECT']), comment: z.string().min(3).max(1000) })
-        .strict(),
-    },
-    async (ctx, b, _q, req) => decide(ctx, id(req), b.decision, b.comment),
-  );
-  endpoint(
-    app,
-    'post',
-    root + '/approvals/:id/resubmit',
-    { summary: 'Resubmit your rejected approval with its original terms' },
-    async (ctx, _b, _q, req) =>
-      transaction(async (tx) => {
-        const old = found(
-          await tx.approval.findFirst({
-            where: { id: id(req), projectId: ctx.projectId, requestedBy: ctx.actor.id },
-          }),
-        );
-        requireState(
-          old.status === 'REJECTED',
-          'APPROVAL_NOT_REJECTED',
-          'Only a rejected request can be resubmitted.',
-        );
-        const operation = old.operation as Operation;
-        const requestPermissions: Record<Operation, string> = {
-          DISCOUNT: 'discounts.request',
-          BOOKING: 'bookings.create',
-          PRICE: 'inventory.update',
-          RESCHEDULE: 'bookings.create',
-          PAYMENT_REVERSAL: 'payments.reverse',
-          NDC: 'ndc.request',
-          TRANSFER: 'transfers.request',
-          CANCELLATION: 'bookings.cancel',
-          REFUND: 'refunds.request',
-          COMMISSION: 'commissions.approve',
-          POSSESSION: 'possession.manage',
-          JOURNAL: 'finance.post',
-        };
-        requireState(
-          ctx.actor.permissions.has(requestPermissions[operation]),
-          'FORBIDDEN',
-          'Request permission is required.',
-          403,
-        );
-        return requestApproval(
-          tx,
-          ctx,
-          operation,
-          old.entityId,
-          old.amount.toFixed(2),
-          old.payload,
-        );
-      }),
-  );
-  endpoint(
-    app,
-    'post',
-    root + '/approval-policies',
-    {
-      permission: 'approvals.manage',
-      summary: 'Configure approval thresholds and sequential permission levels',
-      body: z
-        .object({
-          operation: z.enum(
-            Object.keys(approvalPermissions) as [
-              keyof typeof approvalPermissions,
-              ...(keyof typeof approvalPermissions)[],
-            ],
-          ),
-          minimumAmount: money,
-          permissions: z.array(z.enum(permissions)).min(1).max(5),
-        })
-        .strict(),
-    },
-    async (ctx, b) =>
-      transaction(async (tx) => {
-        const result = await tx.approvalPolicy.upsert({
-          where: {
-            projectId_operation_minimumAmount: {
-              projectId: ctx.projectId,
-              operation: b.operation,
-              minimumAmount: b.minimumAmount,
-            },
-          },
-          create: { ...b, projectId: ctx.projectId },
-          update: { permissions: b.permissions },
-        });
-        await audit(tx, ctx, 'approval.policy_changed', result.id, b);
-        return result;
-      }),
-  );
   endpoint(
     app,
     'post',
@@ -171,8 +42,8 @@ export function workflowRoutes(app: Express) {
     app,
     'post',
     root + '/ndcs/:id/issue',
-    { permission: 'ndc.approve', summary: 'Issue approved NDC with expiry', body: approved },
-    async (ctx, b, _q, req) => workflows.issueNdc(ctx, id(req), b.approvalId),
+    { permission: 'ndc.approve', summary: 'Issue NDC with expiry', body: directAction },
+    async (ctx, b, _q, req) => workflows.issueNdc(ctx, id(req)),
   );
   endpoint(
     app,
@@ -186,7 +57,12 @@ export function workflowRoutes(app: Express) {
         status: q.status,
       };
       const [items, total] = await Promise.all([
-        db.ndc.findMany({ where, ...pagination(q), orderBy: { id: q.sort } }),
+        db.ndc.findMany({
+          where,
+          include: { booking: { select: { reference: true } } },
+          ...pagination(q),
+          orderBy: { id: q.sort },
+        }),
         db.ndc.count({ where }),
       ]);
       return paged(items, total, q);
@@ -199,7 +75,14 @@ export function workflowRoutes(app: Express) {
     {
       permission: 'transfers.request',
       summary: 'Request full ownership transfer',
-      body: z.object({ bookingId: uuid, buyerId: uuid, ndcId: uuid, charges: money }).strict(),
+      body: z
+        .object({
+          bookingId: uuid,
+          buyerId: uuid,
+          charges: money,
+          verification: transferVerification,
+        })
+        .strict(),
     },
     async (ctx, b) => workflows.requestTransfer(ctx, b),
   );
@@ -210,7 +93,7 @@ export function workflowRoutes(app: Express) {
     {
       permission: 'payments.verify',
       summary: 'Verify and post transfer charge settlement',
-      body: settlement.omit({ approvalId: true }),
+      body: settlement,
     },
     async (ctx, b, _q, req) => workflows.transferFee(ctx, id(req), b),
   );
@@ -221,9 +104,9 @@ export function workflowRoutes(app: Express) {
     {
       permission: 'transfers.approve',
       summary: 'Atomically transfer ownership and retain previous owners',
-      body: approved,
+      body: directAction,
     },
-    async (ctx, b, _q, req) => workflows.completeTransfer(ctx, id(req), b.approvalId),
+    async (ctx, b, _q, req) => workflows.completeTransfer(ctx, id(req)),
   );
   endpoint(
     app,
@@ -248,7 +131,12 @@ export function workflowRoutes(app: Express) {
         status: q.status,
       };
       const [items, total] = await Promise.all([
-        db.transfer.findMany({ where, ...pagination(q), orderBy: { id: q.sort } }),
+        db.transfer.findMany({
+          where,
+          include: { booking: { select: { reference: true } }, buyer: { select: { name: true } } },
+          ...pagination(q),
+          orderBy: { id: q.sort },
+        }),
         db.transfer.count({ where }),
       ]);
       return paged(items, total, q);
@@ -273,10 +161,10 @@ export function workflowRoutes(app: Express) {
     root + '/cancellations/:id/complete',
     {
       permission: 'bookings.cancel',
-      summary: 'Execute approved cancellation and release inventory',
-      body: approved,
+      summary: 'Execute cancellation and release inventory',
+      body: directAction,
     },
-    async (ctx, b, _q, req) => workflows.completeCancellation(ctx, id(req), b.approvalId),
+    async (ctx, b, _q, req) => workflows.completeCancellation(ctx, id(req)),
   );
   endpoint(
     app,
@@ -284,7 +172,7 @@ export function workflowRoutes(app: Express) {
     root + '/cancellations/:id/recalculate',
     {
       permission: 'bookings.cancel',
-      summary: 'Recalculate changed collections and request fresh cancellation approval',
+      summary: 'Recalculate changed collections',
       body: z.object({ deduction: money, reason: z.string().min(3).max(1000) }).strict(),
     },
     async (ctx, b, _q, req) =>
@@ -331,14 +219,7 @@ export function workflowRoutes(app: Express) {
           deduction: cancellation.deduction,
           refundable: cancellation.refundable,
         });
-        const approval = await requestApproval(
-          tx,
-          ctx,
-          'CANCELLATION',
-          current.id,
-          cancellation.refundable.toFixed(2),
-        );
-        return { cancellation, approval };
+        return { cancellation };
       }),
   );
   endpoint(
@@ -359,7 +240,7 @@ export function workflowRoutes(app: Express) {
       const [items, total] = await Promise.all([
         db.cancellation.findMany({
           where,
-          include: { refunds: true },
+          include: { refunds: true, booking: { select: { reference: true } } },
           ...pagination(q),
           orderBy: { id: q.sort },
         }),
@@ -385,7 +266,7 @@ export function workflowRoutes(app: Express) {
     root + '/refunds/:id/pay',
     {
       permission: 'refunds.approve',
-      summary: 'Pay approved refund and post balanced journal',
+      summary: 'Pay refund and post balanced journal',
       body: settlement,
     },
     async (ctx, b, _q, req) => workflows.payRefund(ctx, id(req), b),
@@ -436,9 +317,9 @@ export function workflowRoutes(app: Express) {
     {
       permission: 'possession.manage',
       summary: 'Request possession after clearing dues',
-      body: z.object({ bookingId: uuid }).strict(),
+      body: z.object({ bookingId: uuid, verification: possessionVerification }).strict(),
     },
-    async (ctx, b) => workflows.requestPossession(ctx, b.bookingId),
+    async (ctx, b) => workflows.requestPossession(ctx, b.bookingId, b.verification),
   );
   endpoint(
     app,
@@ -458,7 +339,7 @@ export function workflowRoutes(app: Express) {
       const [items, total] = await Promise.all([
         db.possession.findMany({
           where,
-          include: { snags: true },
+          include: { snags: true, booking: { select: { reference: true } } },
           ...pagination(q),
           orderBy: { id: q.sort },
         }),
@@ -536,20 +417,86 @@ export function workflowRoutes(app: Express) {
     root + '/possessions/:id/handover',
     {
       permission: 'possession.approve',
-      summary: 'Complete approved handover after snag and dues checks',
-      body: approved,
+      summary: 'Complete handover after snag and dues checks',
+      body: handoverAcknowledgement,
     },
-    async (ctx, b, _q, req) => workflows.handover(ctx, id(req), b.approvalId),
+    async (ctx, b, _q, req) => workflows.handover(ctx, id(req), b),
   );
-  endpoint(
-    app,
-    'post',
-    root + '/commissions/:id/settle',
-    {
-      permission: 'commissions.approve',
-      summary: 'Settle approved dealer commission once',
-      body: settlement,
-    },
-    async (ctx, b, _q, req) => workflows.settleCommission(ctx, id(req), b),
-  );
+  for (const kind of ['transfers', 'possessions'] as const) {
+    endpoint(
+      app,
+      'get',
+      root + `/${kind}/:id`,
+      {
+        permission: 'bookings.read',
+        summary: 'Get ownership case details',
+      },
+      async (ctx, _b, _q, req) => {
+        const where = { id: id(req), booking: { unit: { projectId: ctx.projectId } } };
+        const booking = {
+          select: {
+            reference: true,
+            customer: { select: { name: true } },
+            unit: { select: { number: true } },
+          },
+        };
+        return found(
+          kind === 'transfers'
+            ? await db.transfer.findFirst({
+                where,
+                include: { booking, buyer: { select: { name: true } } },
+              })
+            : await db.possession.findFirst({ where, include: { booking, snags: true } }),
+        );
+      },
+    );
+    endpoint(
+      app,
+      'patch',
+      root + `/${kind}/:id/verification`,
+      {
+        permission: kind === 'transfers' ? 'transfers.request' : 'possession.manage',
+        summary: 'Review case documents',
+        body: z
+          .object({
+            verification: kind === 'transfers' ? transferVerification : possessionVerification,
+          })
+          .strict(),
+      },
+      async (ctx, body, _q, req) =>
+        transaction(async (tx) => {
+          const where = { id: id(req), booking: { unit: { projectId: ctx.projectId } } };
+          const current = found(
+            kind === 'transfers'
+              ? await tx.transfer.findFirst({ where })
+              : await tx.possession.findFirst({ where }),
+          );
+          const booking = await scopedBooking(tx, ctx, current.bookingId);
+          await lock(tx, kind === 'transfers' ? 'Transfer' : 'Possession', current.id);
+          const latest = found(
+            kind === 'transfers'
+              ? await tx.transfer.findUnique({ where: { id: current.id } })
+              : await tx.possession.findUnique({ where: { id: current.id } }),
+          );
+          requireState(
+            latest.status === 'PENDING',
+            'REQUEST_CLOSED',
+            'Only pending requests can be updated.',
+          );
+          const data = {
+            verification: verificationRecord(
+              body.verification,
+              booking.owners.map((owner) => owner.customerId),
+              ctx.actor.id,
+            ),
+          };
+          const result =
+            kind === 'transfers'
+              ? await tx.transfer.update({ where: { id: current.id }, data })
+              : await tx.possession.update({ where: { id: current.id }, data });
+          await audit(tx, ctx, `${kind}.documents_reviewed`, current.id, data);
+          return result;
+        }),
+    );
+  }
 }

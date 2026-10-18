@@ -8,7 +8,6 @@ import { redis } from '../src/integrations/redis.js';
 import { ensureStorage, storage } from '../src/integrations/storage.js';
 import { passwordHash } from '../src/modules/auth/service.js';
 import { permissions } from '../src/common/permissions.js';
-import { expireReservations } from '../src/modules/sales/service.js';
 import { pdfBuffer, generateArtifact } from '../src/jobs/artifacts.js';
 import { buildOpenApi } from '../src/docs/openapi.js';
 import { env } from '../src/config/env.js';
@@ -19,12 +18,10 @@ let tokenA: string,
   tokenB: string,
   limitedToken: string,
   actorA: string,
-  actorB: string,
   projectId: string,
   otherProjectId: string,
   customerId: string,
   buyerId: string,
-  planVersionId: string,
   cashId: string;
 let unitSequence = 0;
 const root = () => `/api/v1/projects/${projectId}`;
@@ -90,27 +87,23 @@ async function unit(price = '1000.00') {
     201,
   );
 }
-async function reserve(unitId: string) {
-  return post<{ id: string }>(root() + '/reservations', { unitId, customerId }, tokenA, 201);
-}
-async function draft(price = '1000.00', dealerId?: string) {
+async function draft(price = '1000.00') {
   const u = await unit(price);
-  const reservation = await reserve(u.id);
-  const result = await post<{ booking: { id: string; total: string }; approval: { id: string } }>(
+  const result = await post<{ booking: { id: string; total: string } }>(
     root() + '/bookings',
-    { reservationId: reservation.id, planVersionId, dealerId },
+    {
+      unitId: u.id,
+      customerId,
+      paymentType: 'INSTALLMENTS',
+      downPayment: new Prisma.Decimal(price).mul('0.2').toFixed(2),
+      installmentCount: 1,
+      intervalMonths: 1,
+      firstInstallmentDate: '2090-01-01',
+    },
     tokenA,
     201,
   );
   return { ...result, unit: u };
-}
-async function approve(approvalId: string) {
-  const approval = await db.approval.findUniqueOrThrow({ where: { id: approvalId } });
-  return post(
-    root() + `/approvals/${approvalId}/decide`,
-    { decision: 'APPROVE', comment: 'Verified supporting records' },
-    approval.requestedBy === actorB ? tokenA : tokenB,
-  );
 }
 async function payment(bookingId: string, amount: string, method = 'CASH') {
   const proofImageId = method === 'CASH' ? undefined : await recordImage('PAYMENT');
@@ -128,7 +121,7 @@ async function payment(bookingId: string, amount: string, method = 'CASH') {
     201,
   );
 }
-async function recordImage(purpose: 'PAYMENT' | 'DEALER') {
+async function recordImage(purpose: 'PAYMENT') {
   const png = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1cAAAAASUVORK5CYII=',
     'base64',
@@ -152,11 +145,10 @@ async function clear(paymentId: string) {
       .send({ decision: 'CLEARED', reason: 'Bank credit checked' }),
   );
 }
-async function confirmed(price = '1000.00', dealerId?: string) {
-  const b = await draft(price, dealerId);
+async function confirmed(price = '1000.00') {
+  const b = await draft(price);
+  await post(root() + `/bookings/${b.booking.id}/confirm`, {}, tokenB);
   await clear((await payment(b.booking.id, price)).id);
-  await approve(b.approval.id);
-  await post(root() + `/bookings/${b.booking.id}/confirm`, { approvalId: b.approval.id }, tokenB);
   return b;
 }
 beforeAll(async () => {
@@ -199,7 +191,6 @@ beforeAll(async () => {
       roles: { create: { roleId: role.id } },
     },
   });
-  actorB = b.id;
   const reader = await db.user.create({
     data: {
       email: 'reader@test.invalid',
@@ -214,7 +205,7 @@ beforeAll(async () => {
   projectId = (
     await post<{ id: string }>(
       '/api/v1/projects',
-      { code: 'PMS-TEST', name: 'Integration test project' },
+      { name: 'Integration test project', location: 'Lahore' },
       tokenA,
       201,
     )
@@ -222,7 +213,7 @@ beforeAll(async () => {
   otherProjectId = (
     await post<{ id: string }>(
       '/api/v1/projects',
-      { code: 'PMS-OTHER', name: 'Other project' },
+      { name: 'Other project', location: 'Karachi' },
       tokenA,
       201,
     )
@@ -235,14 +226,6 @@ beforeAll(async () => {
   });
   customerId = (await customer('Customer A')).id;
   buyerId = (await customer('Buyer B')).id;
-  const plan = await post<{ versions: { id: string }[] }>(root() + '/payment-plans', {
-    name: 'Two installments',
-    schedule: [
-      { label: 'Down payment', percent: '20', days: 0 },
-      { label: 'Balance', percent: '80', months: 1 },
-    ],
-  });
-  planVersionId = plan.versions[0]!.id;
   cashId = (
     await db.account.findUniqueOrThrow({ where: { projectId_code: { projectId, code: '1000' } } })
   ).id;
@@ -328,11 +311,16 @@ describe('authentication and authorization', () => {
   });
 });
 describe('inventory, booking and collections', () => {
-  it('allows exactly one competing reservation and prevents cross-project customers', async () => {
+  it('allows exactly one competing booking and prevents cross-project customers', async () => {
     const u = await unit();
     const results = await Promise.all(
       [1, 2, 3].map(() =>
-        auth(api.post(root() + '/reservations')).send({ unitId: u.id, customerId }),
+        auth(api.post(root() + '/bookings')).send({
+          unitId: u.id,
+          customerId,
+          paymentType: 'FULL_PAYMENT',
+          confirm: true,
+        }),
       ),
     );
     expect(results.filter((r) => r.status === 201)).toHaveLength(1);
@@ -348,61 +336,39 @@ describe('inventory, booking and collections', () => {
     const free = await unit();
     expect(
       (
-        await auth(api.post(root() + '/reservations')).send({
+        await auth(api.post(root() + '/bookings')).send({
           unitId: free.id,
           customerId: outside.id,
+          paymentType: 'FULL_PAYMENT',
         })
       ).status,
     ).toBe(404);
   });
-  it('expires holds through the worker and can reserve them again', async () => {
-    const u = await unit();
-    const r = await reserve(u.id);
-    await db.reservation.update({
-      where: { id: r.id },
-      data: { expiresAt: new Date(Date.now() - 1000) },
-    });
-    await expireReservations();
-    expect((await db.unit.findUniqueOrThrow({ where: { id: u.id } })).status).toBe('AVAILABLE');
-    expect((await reserve(u.id)).id).not.toBe(r.id);
-  });
-  it('blocks confirmation without cleared down payment and prevents self approval', async () => {
+  it('retires hold and approval APIs and permits confirmation before payment', async () => {
+    expect((await auth(api.post(root() + '/reservations')).send({})).status).toBe(404);
+    expect((await auth(api.get(root() + '/approvals'))).status).toBe(404);
     const b = await draft();
-    const self = await auth(api.post(root() + `/approvals/${b.approval.id}/decide`)).send({
-      decision: 'APPROVE',
-      comment: 'Self approval attempt',
-    });
-    expect(self.status).toBe(403);
-    await approve(b.approval.id);
-    const confirm = await auth(api.post(root() + `/bookings/${b.booking.id}/confirm`), tokenB).send(
-      { approvalId: b.approval.id },
-    );
-    expect(confirm.status).toBe(409);
-    expect(confirm.body.error.code).toBe('DOWN_PAYMENT_REQUIRED');
-  });
-  it('enforces approval data binding for discounts', async () => {
-    const u = await unit();
-    const approval = await post<{ id: string }>(root() + `/units/${u.id}/discount-requests`, {
-      amount: '50',
-    });
     expect(
-      (
-        await auth(api.post(root() + `/approvals/${approval.id}/decide`), limitedToken).send({
-          decision: 'APPROVE',
-          comment: 'Unauthorized',
-        })
-      ).status,
+      (await auth(api.post(root() + `/bookings/${b.booking.id}/confirm`), limitedToken).send({}))
+        .status,
     ).toBe(403);
-    await approve(approval.id);
-    const r = await reserve(u.id);
-    const res = await auth(api.post(root() + '/bookings')).send({
-      reservationId: r.id,
-      planVersionId,
-      discount: '100',
-      discountApprovalId: approval.id,
-    });
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('APPROVAL_DATA_CHANGED');
+    await post(root() + `/bookings/${b.booking.id}/confirm`, {}, tokenB);
+    expect(await db.payment.count({ where: { bookingId: b.booking.id } })).toBe(0);
+    expect((await db.booking.findUniqueOrThrow({ where: { id: b.booking.id } })).status).toBe(
+      'CONFIRMED',
+    );
+  });
+  it('rejects an excessive discount and allows an authorized direct discount', async () => {
+    const u = await unit();
+    const body = { unitId: u.id, customerId, paymentType: 'FULL_PAYMENT', discount: '1001' };
+    expect((await auth(api.post(root() + '/bookings')).send(body)).status).toBe(422);
+    const result = await post<{ booking: { total: string } }>(
+      root() + '/bookings',
+      { ...body, discount: '100', confirm: true },
+      tokenA,
+      201,
+    );
+    expect(result.booking.total).toBe('900');
   });
   it('deduplicates simultaneous payment creation and rejects changed idempotency payloads', async () => {
     const b = await draft();
@@ -462,14 +428,9 @@ describe('inventory, booking and collections', () => {
       await auth(api.get(root() + `/bookings/${b.booking.id}`)),
     );
     expect(detail.position.outstanding).toBe('750.00');
-    await approve(b.approval.id);
-    await post(root() + `/bookings/${b.booking.id}/confirm`, { approvalId: b.approval.id }, tokenB);
+    await post(root() + `/bookings/${b.booking.id}/confirm`, {}, tokenB);
     expect(
-      (
-        await auth(api.post(root() + `/bookings/${b.booking.id}/confirm`), tokenB).send({
-          approvalId: b.approval.id,
-        })
-      ).status,
+      (await auth(api.post(root() + `/bookings/${b.booking.id}/confirm`), tokenB).send({})).status,
     ).toBe(409);
   });
   it('rejects bounced cheques without allocations or cleared receipts', async () => {
@@ -487,13 +448,7 @@ describe('inventory, booking and collections', () => {
     const b = await draft();
     const p = await payment(b.booking.id, '300');
     await clear(p.id);
-    const approval = await post<{ id: string }>(root() + `/payments/${p.id}/reversal-requests`);
-    await approve(approval.id);
-    await post(
-      root() + `/payments/${p.id}/reverse`,
-      { approvalId: approval.id, reason: 'Bank correction' },
-      tokenB,
-    );
+    await post(root() + `/payments/${p.id}/reverse`, { reason: 'Bank correction' }, tokenB);
     const rows = await db.paymentAllocation.findMany({ where: { paymentId: p.id } });
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((r) => r.reversedAt)).toBe(true);
@@ -513,18 +468,11 @@ describe('inventory, booking and collections', () => {
     });
     const revision = {
       reason: 'Customer requested extended terms',
-      schedule: [{ label: 'Revised balance', amount: '800', dueDate: '2027-01-01' }],
+      installmentCount: 1,
+      intervalMonths: 1,
+      firstInstallmentDate: '2091-01-01',
     };
-    const approval = await post<{ id: string }>(
-      root() + `/bookings/${b.booking.id}/reschedule-requests`,
-      revision,
-    );
-    await approve(approval.id);
-    await post(
-      root() + `/bookings/${b.booking.id}/reschedule`,
-      { ...revision, approvalId: approval.id },
-      tokenB,
-    );
+    await post(root() + `/bookings/${b.booking.id}/reschedule`, { ...revision }, tokenB);
     expect(
       (await db.installment.findUniqueOrThrow({ where: { id: original[0]!.id } })).superseded,
     ).toBe(false);
@@ -539,13 +487,9 @@ describe('inventory, booking and collections', () => {
     await clear(original.id);
     const advance = await payment(b.booking.id, '1000');
     expect((await clear(advance.id)).allocations).toHaveLength(0);
-    const approval = await post<{ id: string }>(
-      root() + `/payments/${original.id}/reversal-requests`,
-    );
-    await approve(approval.id);
     await post(
       root() + `/payments/${original.id}/reverse`,
-      { approvalId: approval.id, reason: 'Replace original payment' },
+      { reason: 'Replace original payment' },
       tokenB,
     );
     const journals = await db.journal.count({ where: { projectId } });
@@ -578,11 +522,9 @@ describe('inventory, booking and collections', () => {
     ).rejects.toThrow();
     await expect(db.payment.delete({ where: { id: p.id } })).rejects.toThrow();
     await clear(p.id);
-    const approval = await post<{ id: string }>(root() + `/payments/${p.id}/reversal-requests`);
-    await approve(approval.id);
     await post(
       root() + `/payments/${p.id}/reverse`,
-      { approvalId: approval.id, reason: 'Correct recorded payment' },
+      { reason: 'Correct recorded payment' },
       tokenB,
     );
     await expect(
@@ -590,38 +532,32 @@ describe('inventory, booking and collections', () => {
     ).rejects.toThrow();
   });
 });
+import { transferChecks, possessionChecks, handoverReceipt } from './ownership-fixtures.js';
 describe('ownership, accounting and reporting', () => {
-  it('retains seller history after an approved transfer with verified charges', async () => {
+  it('retains seller history after a direct transfer with verified charges', async () => {
     const b = await confirmed();
-    const ndc = await post<{ ndc: { id: string }; approval: { id: string } }>(root() + '/ndcs', {
+    const ndc = await post<{ ndc: { id: string } }>(root() + '/ndcs', {
       bookingId: b.booking.id,
       identityVerified: true,
       documentsVerified: true,
     });
-    await approve(ndc.approval.id);
-    await post(root() + `/ndcs/${ndc.ndc.id}/issue`, { approvalId: ndc.approval.id }, tokenB);
-    const t = await post<{ transfer: { id: string }; approval: { id: string } }>(
-      root() + '/transfers',
-      { bookingId: b.booking.id, buyerId, ndcId: ndc.ndc.id, charges: '50' },
-    );
-    await approve(t.approval.id);
+    await post(root() + `/ndcs/${ndc.ndc.id}/issue`, {}, tokenB);
+    const t = await post<{ transfer: { id: string } }>(root() + '/transfers', {
+      bookingId: b.booking.id,
+      buyerId,
+      verification: transferChecks,
+      charges: '50',
+    });
     expect(
-      (
-        await auth(api.post(root() + `/transfers/${t.transfer.id}/complete`), tokenB).send({
-          approvalId: t.approval.id,
-        })
-      ).status,
+      (await auth(api.post(root() + `/transfers/${t.transfer.id}/complete`), tokenB).send({}))
+        .status,
     ).toBe(409);
     await post(
       root() + `/transfers/${t.transfer.id}/verify-fee`,
       { accountId: cashId, paymentReference: 'TRANSFER-BANK-1' },
       tokenB,
     );
-    await post(
-      root() + `/transfers/${t.transfer.id}/complete`,
-      { approvalId: t.approval.id },
-      tokenB,
-    );
+    await post(root() + `/transfers/${t.transfer.id}/complete`, {}, tokenB);
     const owners = await db.bookingOwner.findMany({ where: { bookingId: b.booking.id } });
     expect(owners).toHaveLength(2);
     expect(owners.find((o) => o.customerId === customerId)?.validTo).not.toBeNull();
@@ -631,26 +567,20 @@ describe('ownership, accounting and reporting', () => {
     const b = await confirmed();
     const c = await post<{
       cancellation: { id: string; refundable: string };
-      approval: { id: string };
     }>(root() + '/cancellations', {
       bookingId: b.booking.id,
       deduction: '100',
       reason: 'Customer cancellation',
     });
     expect(c.cancellation.refundable).toBe('900');
-    await approve(c.approval.id);
-    await post(
-      root() + `/cancellations/${c.cancellation.id}/complete`,
-      { approvalId: c.approval.id },
-      tokenB,
-    );
+    await post(root() + `/cancellations/${c.cancellation.id}/complete`, {}, tokenB);
     expect((await db.unit.findUniqueOrThrow({ where: { id: b.unit.id } })).status).toBe(
       'AVAILABLE',
     );
-    const refund = await post<{ refund: { id: string }; approval: { id: string } }>(
-      root() + '/refunds',
-      { cancellationId: c.cancellation.id, amount: '600' },
-    );
+    const refund = await post<{ refund: { id: string } }>(root() + '/refunds', {
+      cancellationId: c.cancellation.id,
+      amount: '600',
+    });
     expect(
       (
         await auth(api.post(root() + '/refunds')).send({
@@ -659,9 +589,7 @@ describe('ownership, accounting and reporting', () => {
         })
       ).status,
     ).toBe(409);
-    await approve(refund.approval.id);
     const body = {
-      approvalId: refund.approval.id,
       accountId: cashId,
       paymentReference: 'REFUND-BANK-1',
     };
@@ -672,60 +600,38 @@ describe('ownership, accounting and reporting', () => {
   });
   it('requires inspection and resolved snags before handover', async () => {
     const b = await confirmed();
-    const p = await post<{ possession: { id: string }; approval: { id: string } }>(
-      root() + '/possessions',
-      { bookingId: b.booking.id },
-    );
-    await approve(p.approval.id);
+    const p = await post<{ possession: { id: string } }>(root() + '/possessions', {
+      bookingId: b.booking.id,
+      verification: possessionChecks,
+    });
     const inspected = await post<{ snags: { id: string }[] }>(
       root() + `/possessions/${p.possession.id}/inspection`,
       { notes: 'Inspected property', snags: ['Repair entrance fitting'] },
     );
     expect(
       (
-        await auth(api.post(root() + `/possessions/${p.possession.id}/handover`), tokenB).send({
-          approvalId: p.approval.id,
-        })
+        await auth(api.post(root() + `/possessions/${p.possession.id}/handover`), tokenB).send(
+          handoverReceipt,
+        )
       ).status,
     ).toBe(409);
     await post(root() + `/snags/${inspected.snags[0]!.id}/resolve`);
-    await post(
-      root() + `/possessions/${p.possession.id}/handover`,
-      { approvalId: p.approval.id },
-      tokenB,
-    );
+    await post(root() + `/possessions/${p.possession.id}/handover`, handoverReceipt, tokenB);
     expect((await db.unit.findUniqueOrThrow({ where: { id: b.unit.id } })).status).toBe(
       'POSSESSED',
     );
   });
-  it('prevents duplicate dealer settlement', async () => {
-    const dealer = await post<{ id: string }>(root() + '/dealers', {
-      photoId: await recordImage('DEALER'),
-      name: 'Test dealer',
-      phone: '03005555555',
-      commissionPercent: '5',
-    });
-    const b = await confirmed('1000.00', dealer.id);
-    const commission = await db.dealerCommission.findUniqueOrThrow({
-      where: { bookingId: b.booking.id },
-    });
-    const approval = await db.approval.findFirstOrThrow({
-      where: { entityId: commission.id, operation: 'COMMISSION' },
-    });
-    await approve(approval.id);
-    const body = { approvalId: approval.id, accountId: cashId, paymentReference: 'COMMISSION-1' };
-    await post(root() + `/commissions/${commission.id}/settle`, body, tokenB);
+  it('retires dealers and commission settlement without creating new commissions', async () => {
+    expect((await auth(api.get(root() + '/dealers'))).status).toBe(404);
     expect(
-      (await auth(api.post(root() + `/commissions/${commission.id}/settle`), tokenB).send(body))
-        .status,
-    ).toBe(409);
-    expect(
-      await db.journal.count({ where: { source: 'COMMISSION', sourceId: commission.id } }),
-    ).toBe(1);
+      (await auth(api.post(root() + '/commissions/' + randomUUID() + '/settle')).send({})).status,
+    ).toBe(404);
+    const b = await confirmed();
+    expect(await db.dealerCommission.count({ where: { bookingId: b.booking.id } })).toBe(0);
   });
   it('rejects unbalanced journals both in the API and at database commit', async () => {
     const accounts = await db.account.findMany({ where: { projectId }, take: 2 });
-    const response = await auth(api.post(root() + '/journals/requests')).send({
+    const response = await auth(api.post(root() + '/journals')).send({
       description: 'Invalid entry',
       postedAt: new Date().toISOString(),
       lines: [

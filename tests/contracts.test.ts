@@ -106,7 +106,7 @@ describe('generated API contract', () => {
     }
   });
 
-  it('documents a customer-only photo upload and a scoped release for unfinished booking holds', () => {
+  it('documents a customer-only photo upload and no retired workflow routes', () => {
     expect(routeDocs.find((route) => route.path === '/portal/profile/photo')).toMatchObject({
       audience: 'customer',
       multipart: true,
@@ -125,6 +125,13 @@ describe('generated API contract', () => {
     });
     expect(
       routeDocs.find((route) => route.path === '/projects/:projectId/reservations/:id/release'),
-    ).toMatchObject({ permission: 'reservations.create' });
+    ).toBeUndefined();
+    expect(
+      routeDocs.filter((route) =>
+        /\/(leads|dealers|approvals|approval-policies|reservations|commissions)(\/|$)/.test(
+          route.path,
+        ),
+      ),
+    ).toHaveLength(0);
   });
 });

@@ -13,6 +13,8 @@ const pagination = object({ page: num, limit: num, total: num, totalPages: num }
 const paged = (name: string) => object({ items: array(ref(name)), pagination });
 const result = (key: string) => object({ [key]: bool });
 export function responseSchema(path: string, method: string, hasPagination: boolean): Schema {
+  if (path.endsWith('/installments/:id/payment')) return ref('Payment');
+  if (path.endsWith('/portal/resend-credentials')) return object({ queued: bool, email: str });
   if (/\/(login|refresh)$/.test(path)) {
     const token = object({
       accessToken: str,
@@ -70,11 +72,10 @@ export function responseSchema(path: string, method: string, hasPagination: bool
       outstanding: ref('Money'),
       overdue: ref('Money'),
       defaulterCount: num,
-      pendingApprovals: num,
       upcomingInstallments: num,
     });
-  if (path.endsWith('/reports'))
-    return object({
+  if (path.endsWith('/reports')) {
+    const schema = object({
       kind: str,
       summary: { type: 'object', additionalProperties: { type: ['string', 'boolean'] } },
       rows: array({
@@ -84,13 +85,111 @@ export function responseSchema(path: string, method: string, hasPagination: bool
       count: num,
       currency: str,
     });
+    (schema.properties as Record<string, Schema>).statement = {
+      type: 'object',
+      required: ['project', 'customer', 'generatedAt', 'metrics', 'notes', 'sections'],
+      properties: {
+        project: object({ name: str, currency: str, timezone: str }),
+        customer: {
+          type: 'object',
+          required: ['name', 'reference'],
+          properties: {
+            name: str,
+            reference: str,
+            email: { type: ['string', 'null'] },
+            phone: { type: ['string', 'null'] },
+          },
+        },
+        generatedAt: { type: 'string', format: 'date-time' },
+        reference: str,
+        from: str,
+        to: str,
+        metrics: array({
+          type: 'object',
+          required: ['label', 'amount'],
+          properties: { label: str, amount: ref('Money'), emphasis: bool },
+        }),
+        notes: array(str),
+        sections: array(
+          object({
+            title: str,
+            description: str,
+            columns: array({
+              type: 'object',
+              required: ['key', 'label', 'width'],
+              properties: {
+                key: str,
+                label: str,
+                width: num,
+                type: { type: 'string', enum: ['money', 'date', 'status'] },
+              },
+            }),
+            rows: array({ type: 'object', additionalProperties: { type: ['string', 'null'] } }),
+          }),
+        ),
+      },
+    };
+    return schema;
+  }
   if (path.endsWith('/exports') || path.endsWith('/generate') || path.includes('/jobs/'))
     return ref('BackgroundJob');
   if (path.endsWith('/reschedule')) return ref('BookingPosition');
-  if (path.endsWith('/requests') || path.endsWith('-requests') || path.endsWith('/resubmit'))
-    return ref('Approval');
-  if (path.endsWith('/recalculate'))
-    return object({ cancellation: ref('Cancellation'), approval: ref('Approval') });
+  if (path.endsWith('/recalculate')) return object({ cancellation: ref('Cancellation') });
+  if (path === '/projects/:projectId/settings') return ref('Project');
+  if (method === 'get' && /^\/projects\/:projectId\/(units|customers)(\/:id)?$/.test(path)) {
+    const customer = path.includes('/customers');
+    const booking = {
+      type: 'object',
+      properties: {
+        id: str,
+        reference: str,
+        status: str,
+        paymentType: str,
+        paymentStatus: str,
+        total: ref('Money'),
+        collected: ref('Money'),
+        outstanding: ref('Money'),
+        unit: object({ id: str, number: str }),
+        customers: array(object({ id: str, name: str })),
+      },
+    };
+    const item = {
+      allOf: [
+        ref(customer ? 'Customer' : 'Unit'),
+        {
+          type: 'object',
+          properties: { bookings: array(booking), ...(customer ? { paymentStatus: str } : {}) },
+        },
+      ],
+    };
+    return hasPagination
+      ? {
+          ...object({ items: array(item), pagination }),
+          properties: {
+            items: array(item),
+            pagination,
+            ...(customer
+              ? {
+                  groups: object({
+                    ALL: num,
+                    UNASSIGNED: num,
+                    INSTALLMENTS: num,
+                    FULLY_PAID: num,
+                    PENDING: num,
+                  }),
+                }
+              : {}),
+          },
+        }
+      : item;
+  }
+  if (path === '/projects/:projectId' && method === 'get')
+    return {
+      allOf: [
+        ref('Project'),
+        object({ availableProperties: num, _count: object({ units: num, plans: num }) }),
+      ],
+    };
   const resources: Record<string, string> = {
     users: 'User',
     roles: 'Role',
@@ -99,25 +198,18 @@ export function responseSchema(path: string, method: string, hasPagination: bool
     customers: 'Customer',
     nominees: 'CustomerNominee',
     contacts: 'CustomerContact',
-    reservations: 'Reservation',
     bookings: 'Booking',
     'payment-plans': 'PaymentPlan',
     versions: 'PaymentPlanVersion',
     payments: 'Payment',
     receipts: 'Receipt',
-    approvals: 'Approval',
-    'approval-policies': 'ApprovalPolicy',
     ndcs: 'Ndc',
     transfers: 'Transfer',
     cancellations: 'Cancellation',
     refunds: 'Refund',
     possessions: 'Possession',
     snags: 'Snag',
-    commissions: 'DealerCommission',
-    leads: 'Lead',
     'recovery-cases': 'RecoveryCase',
-    dealers: 'Dealer',
-    allocations: 'DealerAllocation',
     accounts: 'Account',
     'accounting-periods': 'AccountingPeriod',
     journals: 'Journal',
@@ -134,8 +226,7 @@ export function responseSchema(path: string, method: string, hasPagination: bool
   const parts = path.split('/').filter((p) => p && !p.startsWith(':'));
   let resource = parts.filter((p) => p in resources).at(-1);
   if (path.endsWith('/reconcile')) return ref('BankReconciliation');
-  if (path.endsWith('/activities'))
-    return ref(path.includes('/leads/') ? 'LeadActivity' : 'RecoveryActivity');
+  if (path.endsWith('/activities')) return ref('RecoveryActivity');
   if (path.endsWith('/accounting')) resource = 'settings';
   const model = resources[resource ?? ''];
   if (model) {
@@ -157,7 +248,6 @@ export function responseSchema(path: string, method: string, hasPagination: bool
             possessions: 'possession',
           } as Record<string, string>
         )[resource!]!]: ref(model),
-        approval: ref('Approval'),
       });
     if (method === 'get' && hasPagination) return paged(model);
     if (method === 'get' && path.endsWith('/' + resource)) return array(ref(model));

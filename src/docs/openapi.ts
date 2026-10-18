@@ -191,7 +191,7 @@ export function buildOpenApi() {
       title: 'Enterprise PMS API',
       version: '1.0.0',
       description:
-        'Centralized online-first PMS. All project paths require explicit project membership. Web refresh cookies require a trusted Origin. Native routes return refresh tokens only for OS secure storage. Financial values are decimal strings. Critical workflows use immutable records, approval checks and serializable transactions.',
+        'Centralized online-first PMS. All project paths require explicit project membership. Web refresh cookies require a trusted Origin. Native routes return refresh tokens only for OS secure storage. Financial values are decimal strings. Critical workflows use immutable records, role permissions, payment verification and serializable transactions.',
     },
     servers: [{ url: '/api/v1' }],
     paths,

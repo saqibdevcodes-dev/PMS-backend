@@ -23,7 +23,7 @@ import {
   resetPassword,
 } from '../src/modules/auth/service.js';
 import { deliverNotification } from '../src/integrations/notifications.js';
-import { requestApproval, decide } from '../src/modules/approvals/service.js';
+
 import { businessEvent } from '../src/jobs/events.js';
 import { hash } from '../src/common/security.js';
 
@@ -242,33 +242,6 @@ it('records SMTP failure, supports retry, escapes HTML and skips an already deli
   expect(
     await db.notificationDelivery.count({ where: { notificationId: n.id, success: true } }),
   ).toBe(1);
-});
-
-it('notifies eligible approvers at each level and sends the final decision to the requester', async () => {
-  const approval = await transaction((tx) =>
-    requestApproval(tx, context(), 'DISCOUNT', randomUUID(), '100'),
-  );
-  const first = await db.notification.findMany({
-    where: { title: 'Approval requires your review' },
-  });
-  expect(new Set(first.map((n) => n.userId))).toEqual(new Set([approverId, secondApproverId]));
-  // Configure a second approval level, then verify the first actor cannot receive it again.
-  await db.approval.update({
-    where: { id: approval.id },
-    data: { permissions: ['discounts.approve', 'bookings.approve'] },
-  });
-  expect(
-    (await decide(context(approverId, ['discounts.approve']), approval.id, 'APPROVE', 'OK')).status,
-  ).toBe('PENDING');
-  expect(await notices(approverId, 'Approval requires your review')).toHaveLength(1);
-  expect(await notices(secondApproverId, 'Approval requires your review')).toHaveLength(2);
-  await decide(context(secondApproverId, ['bookings.approve']), approval.id, 'APPROVE', 'OK');
-  expect(await notices(staffId, 'Your request was approved')).toHaveLength(1);
-  const rejected = await transaction((tx) =>
-    requestApproval(tx, context(), 'DISCOUNT', randomUUID(), '100'),
-  );
-  await decide(context(approverId, ['discounts.approve']), rejected.id, 'REJECT', 'No');
-  expect(await notices(staffId, 'Your request was rejected')).toHaveLength(1);
 });
 
 it('creates project update emails once for active project staff only', async () => {

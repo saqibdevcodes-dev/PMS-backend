@@ -2,29 +2,14 @@ import { z } from 'zod';
 import { DateTime } from 'luxon';
 import { requireImage } from '../images/service.js';
 import { Prisma } from '@prisma/client';
-import { db, transaction, lock, type Tx } from '../../database/client.js';
+import { transaction, lock, type Tx } from '../../database/client.js';
 import type { Context } from '../../common/context.js';
 import { found, requireState } from '../../common/errors.js';
-import { decimal, money, sum, splitAmount } from '../../common/money.js';
+import { decimal, sum } from '../../common/money.js';
 import { audit, reference, outbox, idempotent, json } from '../../common/operations.js';
 import { scopedUnit, unitState } from '../inventory/service.js';
-import { consume, requestApproval } from '../approvals/service.js';
+import { bookingInput, calculatePaymentPlan, equalInstallments } from './payment-plan.js';
 import { postJournal, mappedAccount, reverseJournal } from '../finance/service.js';
-export const scheduleSchema = z
-  .array(
-    z
-      .object({
-        label: z.string().min(1).max(100),
-        percent: money.refine((v) => decimal(v).gt(0) && decimal(v).lte(100)),
-        months: z.number().int().min(0).max(360).default(0),
-        days: z.number().int().min(0).max(10000).default(0),
-        date: z.iso.date().optional(),
-      })
-      .strict(),
-  )
-  .min(1)
-  .max(360)
-  .refine((rows) => sum(rows.map((r) => r.percent)).eq(100), 'Schedule percentages must total 100');
 export async function scopedBooking(tx: Tx, ctx: Context, id: string) {
   await lock(tx, 'Booking', id);
   return found(
@@ -38,126 +23,56 @@ export async function scopedBooking(tx: Tx, ctx: Context, id: string) {
     }),
   );
 }
-export async function expireUnit(tx: Tx, ctx: Context, unitId: string) {
-  const expired = await tx.reservation.updateMany({
-    where: { unitId, status: 'ACTIVE', expiresAt: { lte: new Date() } },
-    data: { status: 'EXPIRED' },
-  });
-  if (expired.count) await unitState(tx, ctx, unitId, 'AVAILABLE', 'Reservation expired');
-}
-export async function reserve(ctx: Context, input: { unitId: string; customerId: string }) {
+export async function createBooking(ctx: Context, input: z.infer<typeof bookingInput>) {
   return transaction(async (tx) => {
-    await scopedUnit(tx, ctx, input.unitId);
-    await expireUnit(tx, ctx, input.unitId);
-    const unit = found(await tx.unit.findUnique({ where: { id: input.unitId } }));
+    const unit = await scopedUnit(tx, ctx, input.unitId);
     requireState(
-      unit.status === 'AVAILABLE',
-      'UNIT_ALREADY_RESERVED',
-      'This property is no longer available.',
+      unit.status === 'AVAILABLE' &&
+        !(await tx.booking.findFirst({ where: { unitId: unit.id, status: { not: 'CANCELLED' } } })),
+      'PROPERTY_UNAVAILABLE',
+      'This property has already been booked or is unavailable. Choose another property.',
+      409,
     );
-    found(
+    const customer = found(
       await tx.customer.findFirst({ where: { id: input.customerId, projectId: ctx.projectId } }),
     );
-    const project = found(await tx.project.findUnique({ where: { id: ctx.projectId } }));
-    const reservation = await tx.reservation.create({
-      data: {
-        ...input,
-        reference: await reference(tx, 'RSV'),
-        expiresAt: new Date(Date.now() + project.reservationMinutes * 60000),
-        createdBy: ctx.actor.id,
-      },
-    });
-    await unitState(tx, ctx, unit.id, 'RESERVED', 'Reservation ' + reservation.reference);
-    return reservation;
-  });
-}
-export async function cancelReservation(ctx: Context, reservationId: string, ownOnly = false) {
-  return transaction(async (tx) => {
-    const row = found(
-      await tx.reservation.findFirst({
-        where: { id: reservationId, unit: { projectId: ctx.projectId } },
-      }),
-    );
-    await scopedUnit(tx, ctx, row.unitId);
-    const current = found(await tx.reservation.findUnique({ where: { id: row.id } }));
-    requireState(
-      !ownOnly || current.createdBy === ctx.actor.id,
-      'FORBIDDEN',
-      'You can only release your own unfinished property hold.',
-      403,
-    );
-    if (ownOnly && ['CANCELLED', 'EXPIRED'].includes(current.status)) return { cancelled: true };
-    requireState(
-      current.status === 'ACTIVE',
-      'RESERVATION_CLOSED',
-      'Only active reservations can be cancelled.',
-    );
-    await tx.reservation.update({ where: { id: row.id }, data: { status: 'CANCELLED' } });
-    await unitState(tx, ctx, row.unitId, 'AVAILABLE', 'Reservation cancelled');
-    return { cancelled: true };
-  });
-}
-export async function createBooking(
-  ctx: Context,
-  input: {
-    reservationId: string;
-    planVersionId: string;
-    discount: string;
-    discountApprovalId?: string;
-    dealerId?: string;
-    owners?: { customerId: string; share: string }[];
-  },
-) {
-  return transaction(async (tx) => {
-    const reservation = found(
-      await tx.reservation.findFirst({
-        where: { id: input.reservationId, unit: { projectId: ctx.projectId } },
-      }),
-    );
-    const unit = await scopedUnit(tx, ctx, reservation.unitId);
-    const current = found(await tx.reservation.findUnique({ where: { id: reservation.id } }));
-    requireState(
-      current.status === 'ACTIVE' && current.expiresAt > new Date() && unit.status === 'RESERVED',
-      'RESERVATION_EXPIRED',
-      'A valid active reservation is required.',
-    );
-    const plan = found(
-      await tx.paymentPlanVersion.findFirst({
-        where: { id: input.planVersionId, plan: { projectId: ctx.projectId } },
-      }),
-    );
-    const schedule = scheduleSchema.parse(plan.schedule);
-    const discount = decimal(input.discount);
-    const total = unit.price.plus(unit.charges).minus(discount);
-    requireState(total.gt(0), 'INVALID_PRICE', 'Booking total must be positive.', 422);
-    if (discount.gt(0)) {
+    if (input.confirm)
       requireState(
-        input.discountApprovalId,
-        'DISCOUNT_APPROVAL_REQUIRED',
-        'An approved discount is required.',
+        ctx.actor.permissions.has('bookings.approve'),
+        'FORBIDDEN',
+        'You do not have permission to confirm bookings.',
+        403,
       );
-      await consume(tx, ctx, input.discountApprovalId, 'DISCOUNT', unit.id, {
-        amount: input.discount,
-      });
-    }
-    if (input.dealerId)
-      found(
-        await tx.dealer.findFirst({
-          where: { id: input.dealerId, projectId: ctx.projectId, active: true },
-        }),
+    const basePrice = decimal(input.sellingPrice ?? unit.price);
+    if (!basePrice.eq(unit.price))
+      requireState(
+        ctx.actor.permissions.has('inventory.change_price'),
+        'FORBIDDEN',
+        'You do not have permission to change the selling price.',
+        403,
       );
-    const owners = input.owners ?? [{ customerId: reservation.customerId, share: '100' }];
+    const discount = decimal(input.discount);
+    if (discount.gt(0))
+      requireState(
+        ctx.actor.permissions.has('discounts.approve'),
+        'FORBIDDEN',
+        'You do not have permission to apply discounts.',
+        403,
+      );
     requireState(
-      sum(owners.map((o) => o.share)).eq(100) &&
-        new Set(owners.map((o) => o.customerId)).size === owners.length,
-      'INVALID_OWNERSHIP',
-      'Unique ownership shares must total 100.',
+      discount.lte(basePrice),
+      'INVALID_DISCOUNT',
+      'Discount cannot exceed the selling price.',
       422,
     );
+    const total = basePrice.plus(unit.charges).minus(discount);
+    const owners = input.owners ?? [{ customerId: customer.id, share: '100' }];
     requireState(
-      owners.some((o) => o.customerId === reservation.customerId),
+      sum(owners.map((o) => o.share)).eq(100) &&
+        new Set(owners.map((o) => o.customerId)).size === owners.length &&
+        owners.some((o) => o.customerId === customer.id),
       'INVALID_OWNERSHIP',
-      'The reserved customer must be an owner.',
+      'Unique ownership shares must total 100 and include the selected customer.',
       422,
     );
     requireState(
@@ -165,53 +80,61 @@ export async function createBooking(
         where: { projectId: ctx.projectId, id: { in: owners.map((o) => o.customerId) } },
       })) === owners.length,
       'INVALID_OWNERSHIP',
-      'Owners must belong to the project.',
+      'All owners must belong to this project.',
       422,
     );
     const project = found(await tx.project.findUnique({ where: { id: ctx.projectId } }));
+    const today = DateTime.now().setZone(project.timezone).toISODate()!;
+    const calculated = calculatePaymentPlan(total, input, project.downPaymentPercent, today);
     const booking = await tx.booking.create({
       data: {
         reference: await reference(tx, 'BKG'),
         unitId: unit.id,
-        customerId: reservation.customerId,
-        reservationId: reservation.id,
-        planVersionId: plan.id,
-        dealerId: input.dealerId,
-        basePrice: unit.price,
+        customerId: customer.id,
+        basePrice,
         charges: unit.charges,
         discount,
         total,
-        downPayment: total.mul(project.downPaymentPercent).div(100).toDecimalPlaces(2),
+        downPayment: calculated.downPayment,
+        paymentType: input.paymentType,
+        paymentTerms: json({
+          paymentType: input.paymentType,
+          downPayment: calculated.downPayment.toFixed(2),
+          installmentCount: input.installmentCount,
+          intervalMonths: input.intervalMonths,
+          firstInstallmentDate: input.firstInstallmentDate,
+        }),
+        status: input.confirm ? 'CONFIRMED' : 'DRAFT',
+        confirmedAt: input.confirm ? new Date() : null,
+        approvedBy: input.confirm ? ctx.actor.id : null,
         createdBy: ctx.actor.id,
         owners: { create: owners },
+        installments: {
+          create: calculated.schedule.map((row, i) => ({
+            ...row,
+            sequence: i + 1,
+            version: 1,
+            dueDate: new Date(row.dueDate),
+          })),
+        },
       },
+      include: { customer: { select: { id: true, name: true } }, unit: true },
     });
-    const amounts = splitAmount(
-      total,
-      schedule.map((s) => s.percent),
+    await unitState(
+      tx,
+      ctx,
+      unit.id,
+      input.confirm ? 'SOLD' : 'BOOKED',
+      'Booking ' + booking.reference,
     );
-    requireState(
-      amounts.every((a) => a.gt(0)),
-      'INSTALLMENT_TOO_SMALL',
-      'Every generated installment must be at least one cent.',
-      422,
-    );
-    const today = DateTime.now().setZone(project.timezone).startOf('day');
-    await tx.installment.createMany({
-      data: schedule.map((s, i) => ({
-        bookingId: booking.id,
-        sequence: i + 1,
-        version: 1,
-        label: s.label,
-        amount: amounts[i]!,
-        dueDate: new Date(s.date ?? today.plus({ months: s.months, days: s.days }).toISODate()!),
-      })),
-    });
-    await tx.reservation.update({ where: { id: reservation.id }, data: { status: 'CONVERTED' } });
-    await unitState(tx, ctx, unit.id, 'BOOKED', 'Booking draft ' + booking.reference);
-    const approval = await requestApproval(tx, ctx, 'BOOKING', booking.id, total.toFixed(2));
     await audit(tx, ctx, 'booking.created', booking.id);
-    return { booking, approval };
+    if (input.confirm)
+      await outbox(tx, 'business-event', {
+        projectId: ctx.projectId,
+        kind: 'Booking confirmed',
+        entityId: booking.id,
+      });
+    return { booking };
   });
 }
 export async function clearedTotal(tx: Tx, bookingId: string) {
@@ -221,7 +144,7 @@ export async function clearedTotal(tx: Tx, bookingId: string) {
   });
   return aggregate._sum.amount ?? decimal(0);
 }
-export async function confirmBooking(ctx: Context, bookingId: string, approvalId: string) {
+export async function confirmBooking(ctx: Context, bookingId: string) {
   return transaction(async (tx) => {
     const booking = await scopedBooking(tx, ctx, bookingId);
     await scopedUnit(tx, ctx, booking.unitId);
@@ -231,26 +154,17 @@ export async function confirmBooking(ctx: Context, bookingId: string, approvalId
       'Only an unconfirmed booking can be confirmed.',
     );
     requireState(
-      (await clearedTotal(tx, booking.id)).gte(booking.downPayment),
-      'DOWN_PAYMENT_REQUIRED',
-      'Cleared down payment is required.',
+      ctx.actor.permissions.has('bookings.approve'),
+      'FORBIDDEN',
+      'You do not have permission to confirm bookings.',
+      403,
     );
-    await consume(tx, ctx, approvalId, 'BOOKING', booking.id);
     const result = await tx.booking.update({
       where: { id: booking.id },
       data: { status: 'CONFIRMED', confirmedAt: new Date(), approvedBy: ctx.actor.id },
     });
     await unitState(tx, ctx, booking.unitId, 'SOLD', 'Booking confirmed');
-    if (booking.dealerId) {
-      const dealer = found(await tx.dealer.findUnique({ where: { id: booking.dealerId } }));
-      const amount = booking.total.mul(dealer.commissionPercent).div(100).toDecimalPlaces(2);
-      if (amount.gt(0)) {
-        const commission = await tx.dealerCommission.create({
-          data: { dealerId: dealer.id, bookingId: booking.id, amount },
-        });
-        await requestApproval(tx, ctx, 'COMMISSION', commission.id, amount.toFixed(2));
-      }
-    }
+
     await audit(tx, ctx, 'booking.confirmed', booking.id);
     await outbox(tx, 'business-event', {
       projectId: ctx.projectId,
@@ -270,12 +184,29 @@ export async function createPayment(
     transactionReference?: string;
     proofImageId?: string;
     methodDetails?: string;
-    receivingAccountId: string;
+    receivingAccountId?: string;
   },
   key: string,
 ) {
   return transaction(async (tx) =>
     idempotent(tx, ctx, 'payment.create', key, input, async () => {
+      const payment = await createPaymentInTransaction(tx, ctx, input);
+      if (ctx.actor.isSuperAdmin) {
+        return verifyPaymentInTransaction(
+          tx,
+          ctx,
+          payment.id,
+          'CLEARED',
+          'Approved on recording by administrator',
+          true,
+        );
+      }
+      return payment;
+    }),
+  );
+}
+type PaymentInput = Parameters<typeof createPayment>[1];
+async function createPaymentInTransaction(tx: Tx, ctx: Context, input: PaymentInput) {
       const booking = await scopedBooking(tx, ctx, input.bookingId);
       requireState(
         booking.status !== 'CANCELLED',
@@ -284,7 +215,11 @@ export async function createPayment(
       );
       const account = found(
         await tx.account.findFirst({
-          where: { id: input.receivingAccountId, projectId: ctx.projectId, active: true },
+          where: {
+            id: input.receivingAccountId ?? (await mappedAccount(tx, ctx.projectId, 'cash')),
+            projectId: ctx.projectId,
+            active: true,
+          },
         }),
       );
       requireState(
@@ -300,11 +235,12 @@ export async function createPayment(
         422,
       );
       requireState(
-        input.method === 'CASH' || input.proofImageId,
+        ['CASH', 'CHEQUE'].includes(input.method) || input.proofImageId,
         'PAYMENT_PROOF_REQUIRED',
-        'Upload a payment proof image for non-cash payments.',
+        'Upload proof for bank transfers and other electronic payments.',
         422,
       );
+      requireState(!['CHEQUE', 'BANK_TRANSFER'].includes(input.method) || Boolean(input.transactionReference?.trim()), 'PAYMENT_REFERENCE_REQUIRED', 'Enter the cheque number or bank transaction ID.', 422);
       requireState(
         input.method !== 'OTHER' || input.methodDetails?.trim(),
         'PAYMENT_METHOD_DETAILS_REQUIRED',
@@ -315,6 +251,7 @@ export async function createPayment(
       const payment = await tx.payment.create({
         data: {
           ...input,
+          receivingAccountId: account.id,
           payerId: booking.customerId,
           paidAt: new Date(input.paidAt),
           receivedBy: ctx.actor.id,
@@ -322,8 +259,6 @@ export async function createPayment(
       });
       await audit(tx, ctx, 'payment.created', payment.id, { amount: input.amount });
       return payment;
-    }),
-  );
 }
 export async function verifyPayment(
   ctx: Context,
@@ -333,7 +268,10 @@ export async function verifyPayment(
   key: string,
 ) {
   return transaction(async (tx) =>
-    idempotent(tx, ctx, 'payment.verify', key, { paymentId, decision, reason }, async () => {
+    idempotent(tx, ctx, 'payment.verify', key, { paymentId, decision, reason }, () => verifyPaymentInTransaction(tx, ctx, paymentId, decision, reason)),
+  );
+}
+async function verifyPaymentInTransaction(tx: Tx, ctx: Context, paymentId: string, decision: 'CLEARED' | 'REJECTED' | 'BOUNCED', reason: string, approveNewCash = false) {
       const initial = found(
         await tx.payment.findFirst({
           where: { id: paymentId, booking: { unit: { projectId: ctx.projectId } } },
@@ -348,7 +286,7 @@ export async function verifyPayment(
         'This payment has already been processed.',
       );
       requireState(
-        payment.receivedBy !== ctx.actor.id,
+        payment.receivedBy !== ctx.actor.id || ctx.actor.isSuperAdmin || (approveNewCash && ctx.actor.permissions.has('payments.verify')),
         'SELF_VERIFICATION_FORBIDDEN',
         'A different user must verify this payment.',
         403,
@@ -424,15 +362,30 @@ export async function verifyPayment(
       });
       await audit(tx, ctx, 'payment.verified', payment.id, { decision });
       return result;
-    }),
-  );
 }
-export async function reversePayment(
-  ctx: Context,
-  paymentId: string,
-  approvalId: string,
-  reason: string,
-) {
+export async function collectInstallment(ctx: Context, installmentId: string,
+  input: { expectedAmount: string; method: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER'; paidAt: string; transactionReference?: string; proofImageId?: string; receivingAccountId?: string }, key: string) {
+  requireState(ctx.actor.permissions.has('payments.create'), 'FORBIDDEN', 'Payment recording permission is required.', 403);
+  requireState(input.method !== 'BANK_TRANSFER' || Boolean(input.receivingAccountId), 'BANK_ACCOUNT_REQUIRED', 'Select the receiving bank account.', 422);
+  if (input.method === 'CASH') requireState(ctx.actor.permissions.has('payments.verify'), 'FORBIDDEN', 'Payment verification permission is required to receive and approve cash.', 403);
+  return transaction(tx => idempotent(tx, ctx, 'installment.collect', key, { installmentId, ...input }, async () => {
+    const installment = found(await tx.installment.findFirst({ where: { id: installmentId, booking: { unit: { projectId: ctx.projectId } } } }));
+    const booking = await scopedBooking(tx, ctx, installment.bookingId);
+    requireState(booking.status === 'CONFIRMED', 'BOOKING_NOT_CONFIRMED', 'Confirm the booking before receiving an installment.');
+    const position = await bookingPosition(tx, booking.id);
+    const next = position.installments.find(item => decimal(item.outstanding).gt(0));
+    requireState(next?.id === installmentId && !installment.superseded, 'INSTALLMENT_NOT_NEXT', 'Refresh the schedule and select the earliest unpaid installment.');
+    requireState(decimal(next.outstanding).eq(input.expectedAmount), 'INSTALLMENT_AMOUNT_CHANGED', 'The outstanding amount changed. Refresh the schedule before recording payment.');
+    requireState(!(await tx.payment.findFirst({ where: { bookingId: booking.id, status: 'PENDING' } })), 'PAYMENT_PENDING', 'This booking already has a pending payment. Verify or reject it from Payments received before adding another installment.');
+    const { expectedAmount: _amount, ...fields } = input;
+    const payment = await createPaymentInTransaction(tx, ctx, { ...fields, bookingId: booking.id, amount: next.outstanding });
+    await audit(tx, ctx, 'installment.payment_recorded', installmentId, { paymentId: payment.id });
+    return (input.method === 'CASH' && ctx.actor.permissions.has('payments.verify')) || ctx.actor.isSuperAdmin
+      ? verifyPaymentInTransaction(tx, ctx, payment.id, 'CLEARED', 'Approved on recording by administrator', true)
+      : payment;
+  }));
+}
+export async function reversePayment(ctx: Context, paymentId: string, reason: string) {
   return transaction(async (tx) => {
     const initial = found(
       await tx.payment.findFirst({
@@ -454,7 +407,6 @@ export async function reversePayment(
       'OWNERSHIP_ALREADY_FINALIZED',
       'Resolve finalized ownership or cancellation before payment reversal.',
     );
-    await consume(tx, ctx, approvalId, 'PAYMENT_REVERSAL', payment.id);
     const journal = found(
       await tx.journal.findUnique({
         where: { source_sourceId: { source: 'PAYMENT', sourceId: payment.id } },
@@ -541,7 +493,7 @@ export async function allocateAdvance(ctx: Context, paymentId: string) {
     });
   });
 }
-export async function bookingPosition(tx: Tx, bookingId: string, asOf = new Date(), graceDays = 0) {
+export async function bookingPosition(tx: Tx, bookingId: string, asOf = new Date()) {
   const booking = found(
     await tx.booking.findUnique({
       where: { id: bookingId },
@@ -554,15 +506,12 @@ export async function bookingPosition(tx: Tx, bookingId: string, asOf = new Date
   const rows = await tx.installment.findMany({
     where: { bookingId, superseded: false },
     include: { allocations: { where: { reversedAt: null } } },
-    orderBy: { dueDate: 'asc' },
+    orderBy: [{ dueDate: 'asc' }, { sequence: 'asc' }],
   });
   const installments = rows.map((row) => {
     const paid = sum(row.allocations.map((a) => a.amount));
     const outstanding = row.amount.minus(paid);
-    const lateDays = Math.max(
-      0,
-      Math.floor((businessDay - row.dueDate.getTime()) / 86400000) - graceDays,
-    );
+    const lateDays = Math.max(0, Math.floor((businessDay - row.dueDate.getTime()) / 86400000));
     return {
       ...row,
       allocations: undefined,
@@ -582,24 +531,11 @@ export async function bookingPosition(tx: Tx, bookingId: string, asOf = new Date
     overdue: sum(installments.map((i) => i.overdue)).toFixed(2),
   };
 }
-export const revisedSchedule = z
-  .array(
-    z
-      .object({
-        label: z.string().min(1).max(100),
-        dueDate: z.iso.date(),
-        amount: money.refine((v) => decimal(v).gt(0)),
-      })
-      .strict(),
-  )
-  .min(1)
-  .max(360);
 export async function reschedule(
   ctx: Context,
   bookingId: string,
-  approvalId: string,
   reason: string,
-  schedule: z.infer<typeof revisedSchedule>,
+  terms: { installmentCount: number; intervalMonths: number; firstInstallmentDate: string },
 ) {
   return transaction(async (tx) => {
     const booking = await scopedBooking(tx, ctx, bookingId);
@@ -608,12 +544,42 @@ export async function reschedule(
       'BOOKING_CANCELLED',
       'Cannot revise a cancelled booking.',
     );
-    await consume(tx, ctx, approvalId, 'RESCHEDULE', booking.id, { reason, schedule });
     const rows = await tx.installment.findMany({
       where: { bookingId, superseded: false },
       include: { allocations: { where: { reversedAt: null } } },
     });
+    requireState(
+      booking.paymentType === 'INSTALLMENTS',
+      'FULL_PAYMENT_BOOKING',
+      'Full-payment bookings do not need an installment schedule.',
+      422,
+    );
+    requireState(
+      (await clearedTotal(tx, booking.id)).gte(booking.downPayment),
+      'DOWN_PAYMENT_REQUIRED',
+      'Record and verify the down payment before changing the remaining schedule.',
+      422,
+    );
     const unpaid = rows.filter((r) => r.allocations.length === 0);
+    requireState(
+      unpaid.length > 0,
+      'NO_UNPAID_INSTALLMENTS',
+      'There are no completely unpaid installments to change.',
+      422,
+    );
+    const project = found(await tx.project.findUnique({ where: { id: ctx.projectId } }));
+    requireState(
+      terms.firstInstallmentDate >= DateTime.now().setZone(project.timezone).toISODate()!,
+      'INVALID_DATE',
+      'Choose a current or future first installment date.',
+      422,
+    );
+    const schedule = equalInstallments(
+      sum(unpaid.map((r) => r.amount)),
+      terms.installmentCount,
+      terms.intervalMonths,
+      terms.firstInstallmentDate,
+    );
     requireState(
       sum(unpaid.map((r) => r.amount)).eq(sum(schedule.map((s) => s.amount))),
       'SCHEDULE_TOTAL_MISMATCH',
@@ -637,27 +603,18 @@ export async function reschedule(
     await tx.scheduleRevision.create({
       data: { bookingId, version, reason, approvedBy: ctx.actor.id },
     });
-    await tx.booking.update({ where: { id: bookingId }, data: { scheduleVersion: version } });
+    await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        scheduleVersion: version,
+        paymentTerms: json({
+          ...terms,
+          paymentType: 'INSTALLMENTS',
+          downPayment: booking.downPayment.toFixed(2),
+        }),
+      },
+    });
     await audit(tx, ctx, 'booking.rescheduled', bookingId, { version });
     return bookingPosition(tx, bookingId);
   });
 }
-export async function expireReservations() {
-  const rows = await db.reservation.findMany({
-    where: { status: 'ACTIVE', expiresAt: { lte: new Date() } },
-    select: { unitId: true, createdBy: true, unit: { select: { projectId: true } } },
-    take: 500,
-  });
-  for (const row of rows)
-    await transaction(async (tx) => {
-      const ctx = {
-        actor: { id: row.createdBy, sessionId: '', permissions: new Set<string>() },
-        projectId: row.unit.projectId,
-        requestId: 'reservation-expiry',
-      };
-      await scopedUnit(tx, ctx, row.unitId);
-      await expireUnit(tx, ctx, row.unitId);
-    });
-  return rows.length;
-}
-export const planData = (schedule: z.infer<typeof scheduleSchema>) => json(schedule);

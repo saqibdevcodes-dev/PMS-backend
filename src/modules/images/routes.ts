@@ -31,7 +31,12 @@ export function imageRoutes(app: Express) {
     {
       summary: 'Upload a private record image; JPEG, PNG or WebP up to 5 MiB',
       multipart: true,
-      body: z.object({ purpose: z.enum(purposes), projectId: uuid.optional() }).strict(),
+      body: z
+        .object({
+          purpose: z.enum(purposes.filter((p) => p !== 'DEALER')),
+          projectId: uuid.optional(),
+        })
+        .strict(),
       status: 201,
       response: z.object({ id: uuid, name: z.string(), mime: z.string(), size: z.number() }),
     },
@@ -128,7 +133,11 @@ export function imageRoutes(app: Express) {
         found(
           await db.project.findFirst({
             where: {
-              OR: [{ photoId: image.id }, { photoIds: { has: image.id } }],
+              OR: [
+                { photoId: image.id },
+                { photoIds: { has: image.id } },
+                { featureImages: { array_contains: [{ imageId: image.id }] } },
+              ],
               access: { some: { userId: ctx.actor.id } },
             },
           }),

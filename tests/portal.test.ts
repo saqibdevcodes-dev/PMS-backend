@@ -41,6 +41,7 @@ import {
 } from '../src/modules/portal/invitations.js';
 import { sendEmail } from '../src/integrations/notifications.js';
 import { putObject } from '../src/integrations/storage.js';
+import { customerStatementReport } from '../src/modules/reports/customer-statement.js';
 
 const app = express();
 app.use(express.json(), cookieParser(), (_req, res, next) => {
@@ -631,12 +632,105 @@ describe('customer portal with real Prisma queries and embedded PostgreSQL', () 
     await db.document.update({ where: { id: shared.id }, data: { portalVisible: false } });
     expect((await get('/portal/documents/' + shared.id + '/download')).status).toBe(404);
   });
+  it('shares project documents with linked customers only and supports withdrawing access', async () => {
+    const another = await db.project.create({ data: { code: 'FOREIGN-DOCS', name: 'Other project' } });
+    const base = { name: 'Project policy.pdf', mime: 'application/pdf', size: 42, sha256: 'test', uploadedBy: staff, portalVisible: true, allProjectCustomers: true };
+    const shared = await db.document.create({ data: { ...base, projectId, key: randomUUID() } });
+    const foreign = await db.document.create({ data: { ...base, projectId: another.id, key: randomUUID() } });
+    for (const token of [tokenA, tokenB]) {
+      const result = await get('/portal/documents', token);
+      expect(result.body.data.items).toContainEqual(expect.objectContaining({ id: shared.id, allProjectCustomers: true }));
+      expect(result.body.data.items).not.toContainEqual(expect.objectContaining({ id: foreign.id }));
+      expect((await get('/portal/documents/' + shared.id + '/download', token)).status).toBe(200);
+      expect((await get('/portal/documents/' + foreign.id + '/download', token)).status).toBe(404);
+    }
+    const privateDoc = await db.document.create({ data: { ...base, allProjectCustomers: false, projectId, customerId: customerA, key: randomUUID() } });
+    expect((await request(app).patch(`/api/v1/projects/${projectId}/documents/${privateDoc.id}/portal-visibility`).set('Authorization', 'Bearer ' + staffToken).send({ portalVisible: true, allProjectCustomers: true })).status).toBe(422);
+    expect((await request(app).patch(`/api/v1/projects/${projectId}/documents/${shared.id}/portal-visibility`).set('Authorization', 'Bearer ' + staffToken).send({ portalVisible: false })).status).toBe(200);
+    expect((await get('/portal/documents/' + shared.id + '/download')).status).toBe(404);
+  });
   it('produces a PDF statement only for an accessible booking', async () => {
     expect((await get('/portal/bookings/' + bookingB + '/statement/download')).status).toBe(404);
     const response = await get('/portal/bookings/' + bookingA + '/statement/download');
     expect(response.status).toBe(200);
     const bytes = vi.mocked(putObject).mock.calls.at(-1)![1];
     expect(bytes.subarray(0, 4).toString()).toBe('%PDF');
+    // A short statement must not acquire extra pages from footer rendering.
+    expect(bytes.toString('latin1').match(/\/Type \/Page\b/g)).toHaveLength(2);
+  });
+  it('keeps statement balances current when payment history is filtered, without leaking internal IDs', async () => {
+    const result = await customerStatementReport(
+      db,
+      projectId,
+      { kind: 'customer-statement', customerId: customerA },
+      1000,
+    );
+    expect(result.statement.metrics.map((m) => m.amount)).toEqual(['300.03', '150.01', '200.02']);
+    expect(result.statement.notes.join(' ')).toContain('50.00');
+    expect(result.statement.sections[0]!.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ reference: 'B-0\nProperty U-0', ownership: 'Current' }),
+        expect.objectContaining({ reference: 'B-1\nProperty U-1', ownership: 'Previous' }),
+      ]),
+    );
+    expect(result.statement.sections[1]!.rows).toEqual([
+      expect.objectContaining({
+        reference: 'RCPT-TEST\nB-0 / U-0',
+        amount: '150.01',
+        status: 'CLEARED',
+      }),
+    ]);
+    expect(JSON.stringify(result.rows)).not.toContain(bookingA);
+    expect(JSON.stringify(result.rows)).not.toContain(customerA);
+    const filtered = await customerStatementReport(
+      db,
+      projectId,
+      { kind: 'customer-statement', customerId: customerA, from: '2090-01-01' },
+      1000,
+    );
+    expect(filtered.statement.sections[1]!.rows).toHaveLength(0);
+    expect(filtered.statement.metrics).toEqual(result.statement.metrics);
+    await expect(
+      customerStatementReport(db, projectId, { kind: 'customer-statement' }, 1000),
+    ).rejects.toMatchObject({ code: 'CUSTOMER_REQUIRED' });
+    await expect(
+      customerStatementReport(
+        db,
+        projectId,
+        { kind: 'customer-statement', customerId: customerA },
+        1,
+      ),
+    ).rejects.toMatchObject({ code: 'REPORT_TOO_LARGE' });
+    const otherProject = await db.project.create({
+      data: { name: 'Other statement project', code: 'STMT-OTHER' },
+    });
+    await expect(
+      customerStatementReport(
+        db,
+        otherProject.id,
+        { kind: 'customer-statement', customerId: customerA },
+        1000,
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+  it('shows cancelled bookings as history without a current balance', async () => {
+    await db.booking.update({ where: { id: bookingA }, data: { status: 'CANCELLED' } });
+    try {
+      const result = await customerStatementReport(
+        db,
+        projectId,
+        { kind: 'customer-statement', customerId: customerA },
+        1000,
+      );
+      expect(result.statement.metrics.map((m) => m.amount)).toEqual(['0.00', '0.00', '0.00']);
+      expect(result.statement.sections[0]!.rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ status: 'CANCELLED', reference: 'B-0\nProperty U-0' }),
+        ]),
+      );
+    } finally {
+      await db.booking.update({ where: { id: bookingA }, data: { status: 'CONFIRMED' } });
+    }
   });
   it('emails newly shared documents only to customers with access and communication consent', async () => {
     await db.customer.update({ where: { id: customerA }, data: { communicationConsent: true } });

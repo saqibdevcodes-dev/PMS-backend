@@ -5,7 +5,13 @@ import { requireState } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
 import { throttle } from '../../integrations/redis.js';
 import { putObject, signedDownload } from '../../integrations/storage.js';
-import { pdfBuffer } from '../../jobs/artifacts.js';
+import { statementPdf } from '../../jobs/statement-pdf.js';
+import {
+  type AccountStatement,
+  paymentColumns,
+  statementStatus,
+  statementMoney,
+} from '../reports/statement-format.js';
 import { ownBooking, financialPosition, projectDay, installmentAmounts } from './service.js';
 import { ownedBookings } from './access.js';
 
@@ -56,37 +62,71 @@ export async function customerStatement(ctx: Context, bookingId: string) {
     'Contact the property office for an extended account statement.',
     422,
   );
-  const lines = [
-    booking.unit.project.name,
-    `Unit: ${booking.unit.number}`,
-    `Booking: ${booking.reference} (${booking.status})`,
-    `Currency: ${booking.unit.project.currency}`,
-    `Generated: ${new Date().toISOString()}`,
-    '',
-    'BOOKING POSITION (whole booking, including joint ownership)',
-    `Contract value: ${position.total}`,
-    `Cleared payments: ${position.paid}`,
-    `Scheduled balance: ${position.outstanding}`,
-    `Overdue installments: ${position.overdue}`,
-    `Unallocated advance credit: ${position.advanceCredit}`,
-    '',
-    booking.status === 'CANCELLED'
-      ? 'Cancelled booking: amounts are historical, not a payment demand. Contact the office for cancellation/refund details.'
-      : 'Only cleared payments reduce balances. Contact the office for any corrections.',
-    '',
-    'CURRENT INSTALLMENT SCHEDULE',
-    ...schedule.map((i) => {
-      const p = installmentAmounts(i);
-      return `${i.dueDate.toISOString().slice(0, 10)} | ${i.label} | Scheduled ${p.amount} | Paid ${p.paid} | Balance ${p.outstanding}`;
-    }),
-    '',
-    'YOUR RECORDED PAYMENTS (linked customer profiles only)',
-    ...payments.map(
-      (p) =>
-        `${p.paidAt.toISOString().slice(0, 10)} | ${p.amount.toFixed(2)} | ${p.method} | ${p.status} | Receipt ${p.receipt?.reference ?? 'not issued'}${p.receipt?.reversedAt ? ' (reversed)' : ''}`,
-    ),
-  ];
-  const pdf = await pdfBuffer('Customer account statement', lines.join('\n'));
+  const profiles = await db.customer.findMany({
+    where: { portalUserId: ctx.actor.id, projectId: booking.unit.project.id },
+    select: { name: true, reference: true, email: true, phone: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  const statement: AccountStatement = {
+    project: booking.unit.project,
+    customer: {
+      name: profiles.map((p) => p.name).join(' / '),
+      reference: profiles.map((p) => p.reference).join(' / '),
+      email: profiles[0]?.email,
+      phone: profiles[0]?.phone,
+    },
+    reference: `${booking.reference} | Property ${booking.unit.number}\n${statementStatus(booking.status)}`,
+    generatedAt: new Date().toISOString(),
+    metrics: [
+      { label: 'Contract value', amount: position.total },
+      { label: 'Verified payments', amount: position.paid },
+      { label: 'Scheduled balance', amount: position.outstanding, emphasis: true },
+    ],
+    notes: [
+      'Balances cover the whole booking, including joint ownership. The payment history below shows only payments made through your linked customer profiles.',
+      booking.status === 'CANCELLED'
+        ? 'CANCELLED BOOKING: These amounts are historical, not a payment demand. Contact the office for cancellation or refund details.'
+        : 'Only verified payments reduce balances. Pending, rejected, bounced and reversed payments do not reduce the amount due.',
+      `Overdue installments: ${booking.unit.project.currency} ${statementMoney(position.overdue)}. Unallocated advance credit: ${booking.unit.project.currency} ${statementMoney(position.advanceCredit)}.`,
+    ],
+    sections: [
+      {
+        title: 'Installment schedule',
+        description: 'Your current schedule, including verified allocations against each payment.',
+        columns: [
+          { key: 'date', label: 'Due date', type: 'date', width: 68 },
+          { key: 'label', label: 'Installment', width: 104 },
+          { key: 'amount', label: 'Scheduled', type: 'money', width: 98 },
+          { key: 'paid', label: 'Paid', type: 'money', width: 88 },
+          { key: 'outstanding', label: 'Balance', type: 'money', width: 98 },
+        ],
+        rows: schedule.map((i) => {
+          const amounts = installmentAmounts(i);
+          return {
+            date: i.dueDate.toISOString().slice(0, 10),
+            label: i.label,
+            amount: amounts.amount,
+            paid: amounts.paid,
+            outstanding: amounts.outstanding,
+          };
+        }),
+      },
+      {
+        title: 'Your payment history',
+        description:
+          'Your recorded payments and receipt references. Status indicates whether a payment has been verified.',
+        columns: paymentColumns,
+        rows: payments.map((p) => ({
+          date: p.paidAt.toISOString(),
+          amount: p.amount.toFixed(2),
+          method: statementStatus(p.method),
+          status: p.status,
+          reference: `${p.receipt?.reference ?? 'Receipt not issued'}${p.receipt?.reversedAt ? ' (reversed)' : ''}\n${booking.reference}`,
+        })),
+      },
+    ],
+  };
+  const pdf = await statementPdf(statement);
   await ownBooking(ctx.actor.id, bookingId);
   const key = `portal-statements/${ctx.actor.id}/${randomUUID()}.pdf`;
   await putObject(key, pdf, 'application/pdf');

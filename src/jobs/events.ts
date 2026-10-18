@@ -155,10 +155,7 @@ export async function scheduleReminders() {
         if (!record.count) return;
         await outbox(tx, 'business-event', {
           projectId: project.id,
-          kind:
-            due.plus({ days: project.graceDays }) < today
-              ? 'Overdue installment'
-              : 'Upcoming installment',
+          kind: due < today ? 'Overdue installment' : 'Upcoming installment',
           entityId: row.id,
         });
       });

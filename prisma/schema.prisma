@@ -73,6 +73,8 @@ enum AccountTypeScope {
 }
 
 model User {
+  credentialsIssuedAt DateTime?
+  firstLoginAt DateTime?
   photoId       String? @db.Uuid
   photo         ImageAsset? @relation("UserPhoto", fields: [photoId], references: [id], onDelete: Restrict)
   id            String              @id @default(uuid()) @db.Uuid
@@ -178,6 +180,10 @@ model Device {
 }
 
 model Project {
+  location String @default("")
+  description String @default("")
+  features String[] @default([])
+  featureImages Json @default("[]")
   photoIds      String[] @default([]) @db.Uuid
   photoId       String? @db.Uuid
   photo         ImageAsset? @relation("ProjectPhoto", fields: [photoId], references: [id], onDelete: Restrict)
@@ -268,6 +274,7 @@ model UnitHistory {
 }
 
 model Customer {
+  identityType String @default("OTHER")
   photoId              String?           @db.Uuid
   photo                ImageAsset?       @relation("CustomerPhoto", fields: [photoId], references: [id], onDelete: Restrict)
   portalUserId         String?           @db.Uuid
@@ -407,12 +414,14 @@ model PaymentPlanVersion {
 }
 
 model Booking {
+  paymentType String @default("INSTALLMENTS")
+  paymentTerms Json @default("{}")
   id              String             @id @default(uuid()) @db.Uuid
   reference       String             @unique
   unitId          String             @db.Uuid
   customerId      String             @db.Uuid
-  reservationId   String             @unique @db.Uuid
-  planVersionId   String             @db.Uuid
+  reservationId   String?            @unique @db.Uuid
+  planVersionId   String?            @db.Uuid
   dealerId        String?            @db.Uuid
   status          BookingStatus      @default(DRAFT)
   basePrice       Decimal            @db.Decimal(18, 2)
@@ -428,8 +437,8 @@ model Booking {
   updatedAt       DateTime           @updatedAt
   unit            Unit               @relation(fields: [unitId], references: [id], onDelete: Restrict)
   customer        Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  reservation     Reservation        @relation(fields: [reservationId], references: [id], onDelete: Restrict)
-  planVersion     PaymentPlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  reservation     Reservation?       @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  planVersion     PaymentPlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
   dealer          Dealer?            @relation(fields: [dealerId], references: [id], onDelete: Restrict)
   owners          BookingOwner[]
   installments    Installment[]
@@ -667,7 +676,8 @@ model Transfer {
   reference        String         @unique
   bookingId        String         @db.Uuid
   buyerId          String         @db.Uuid
-  ndcId            String         @db.Uuid
+  ndcId            String?        @db.Uuid
+  verification     Json?
   charges          Decimal        @db.Decimal(18, 2)
   paidAt           DateTime?
   paymentReference String?
@@ -676,7 +686,7 @@ model Transfer {
   completedAt      DateTime?
   booking          Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
   buyer            Customer       @relation(fields: [buyerId], references: [id], onDelete: Restrict)
-  ndc              Ndc            @relation(fields: [ndcId], references: [id], onDelete: Restrict)
+  ndc              Ndc?           @relation(fields: [ndcId], references: [id], onDelete: Restrict)
 }
 
 model Cancellation {
@@ -711,6 +721,9 @@ model Possession {
   inspectionAt    DateTime?
   inspectionNotes String?
   handoverAt      DateTime?
+  verification    Json?
+  handoverReference String?
+  receivedByName  String?
   snags           Snag[]
   booking         Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
 }
@@ -820,6 +833,7 @@ model Vendor {
 }
 
 model Document {
+  allProjectCustomers Boolean @default(false)
   portalVisible Boolean @default(false)
   id         String    @id @default(uuid()) @db.Uuid
   projectId  String    @db.Uuid

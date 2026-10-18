@@ -6,6 +6,7 @@ import { report, reportQuery, type ReportRow } from '../modules/reports/service.
 import { putObject } from '../integrations/storage.js';
 import { found, requireState } from '../common/errors.js';
 import { emailUser, webLink } from '../common/notifications.js';
+import { statementPdf } from './statement-pdf.js';
 export function pdfBuffer(title: string, rows: ReportRow[] | string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 42, info: { Title: title } });
@@ -99,7 +100,10 @@ export async function generateArtifact(jobId: string) {
         body = Buffer.from(await workbook.xlsx.writeBuffer());
         mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       } else {
-        body = await pdfBuffer(input.report.kind + ' report', result.rows);
+        body =
+          'statement' in result && result.statement
+            ? await statementPdf(result.statement)
+            : await pdfBuffer(input.report.kind + ' report', result.rows);
         mime = 'application/pdf';
       }
     } else {

@@ -1,4 +1,5 @@
 import { deliverInvitation } from '../modules/portal/invitations.js';
+import { deliverCredentials } from '../modules/portal/credentials.js';
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
@@ -9,7 +10,6 @@ import { businessEvent, scheduleReminders } from './events.js';
 import { decrypt } from '../common/security.js';
 import { generateArtifact } from './artifacts.js';
 import { deliverNotification, sendEmail } from '../integrations/notifications.js';
-import { expireReservations } from '../modules/sales/service.js';
 import { ensureStorage, storage } from '../integrations/storage.js';
 import { redis } from '../integrations/redis.js';
 import { webLink } from '../common/notifications.js';
@@ -22,7 +22,6 @@ const worker = new Worker(
   env.NODE_ENV === 'test' ? 'pms-events-test' : 'pms-events',
   async (job) => {
     if (job.name === 'maintenance') {
-      await expireReservations();
       await scheduleReminders();
       return;
     }
@@ -39,6 +38,9 @@ const worker = new Worker(
         `Open the password reset screen: ${webLink('/reset-password')}\n\nYour one-time reset token is ${decrypt(input.encryptedToken)}. Paste it into the Recovery token field and choose a new password. It expires in 30 minutes.\n\nIf you did not request this, you can ignore this email. Your password has not changed.`,
         event.id,
       );
+    } else if (event.kind === 'customer-credentials') {
+      const input = z.object({ customerId: z.uuid(), encryptedPassword: z.string(), issuedAt: z.string() }).parse(event.payload);
+      await deliverCredentials(input.customerId, input.encryptedPassword, input.issuedAt, event.id);
     } else if (event.kind === 'customer-invitation') {
       const input = z
         .object({ invitationId: z.uuid(), encryptedToken: z.string() })
@@ -52,7 +54,7 @@ const worker = new Worker(
     } else if (event.kind === 'business-event') {
       await businessEvent(event);
     } else throw new Error('Unrecognized outbox event');
-    await db.outbox.update({ where: { id: event.id }, data: { processedAt: new Date() } });
+    await db.outbox.update({ where: { id: event.id }, data: { processedAt: new Date(), ...(event.kind === 'customer-credentials' ? { payload: { completed: true } } : {}) } });
   },
   { connection, concurrency: 4 },
 );

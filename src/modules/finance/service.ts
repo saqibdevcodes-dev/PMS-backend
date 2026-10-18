@@ -73,9 +73,18 @@ export async function postJournal(
   );
   const postedAt = input.postedAt ?? new Date();
   const day = new Date(postedAt.toISOString().slice(0, 10));
-  const periods = await tx.accountingPeriod.findMany({
+  // Serialize automatic period creation without reopening any closed period.
+  await lock(tx, 'Project', ctx.projectId);
+  let periods = await tx.accountingPeriod.findMany({
     where: { projectId: ctx.projectId, startDate: { lte: day }, endDate: { gte: day } },
   });
+  if (periods.length === 0) {
+    const period = await tx.accountingPeriod.create({
+      data: { projectId: ctx.projectId, startDate: day, endDate: day },
+    });
+    periods = [period];
+    await audit(tx, ctx, 'finance.period_created', period.id, { automatic: true });
+  }
   requireState(
     periods.length === 1,
     'ACCOUNTING_PERIOD_REQUIRED',
@@ -142,11 +151,8 @@ export async function defaultAccounts(tx: Tx, projectId: string) {
   const definitions = [
     ['1000', 'Cash and bank', 'ASSET', 'cash'],
     ['2000', 'Customer advances', 'LIABILITY', 'advances'],
-    ['2100', 'Dealer payable', 'LIABILITY', 'dealerPayable'],
     ['4000', 'Cancellation deductions', 'REVENUE', 'deductions'],
     ['4100', 'Transfer services', 'REVENUE', 'transferRevenue'],
-    ['5000', 'Dealer commission expense', 'EXPENSE', 'commissionExpense'],
-    ['1200', 'Dealer commission recoverable', 'ASSET', 'dealerRecoverable'],
   ] as const;
   const mapping: Record<string, string> = {};
   for (const [code, name, type, key] of definitions) {

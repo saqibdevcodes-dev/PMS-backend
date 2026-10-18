@@ -42,7 +42,7 @@ export function documentRoutes(app: Express) {
     },
     multer({
       storage: multer.memoryStorage(),
-      limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 4, parts: 5 },
+      limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 5, parts: 6 },
     }).single('file'),
   );
   endpoint(
@@ -65,11 +65,16 @@ export function documentRoutes(app: Express) {
             .regex(/^[^\\/\x00-\x1f]+$/),
           customerId: uuid.optional(),
           bookingId: uuid.optional(),
+          audience: z.enum(['STAFF_ONLY', 'SELECTED_CUSTOMER', 'ALL_PROJECT_CUSTOMERS']).default('STAFF_ONLY'),
         })
         .strict(),
       status: 201,
     },
     async (ctx, b, _q, req) => {
+      const { audience, ...fields } = b;
+      requireState(audience !== 'ALL_PROJECT_CUSTOMERS' || (!b.customerId && !b.bookingId), 'PRIVATE_DOCUMENT_OWNER', 'A document for all project customers cannot be linked to a private customer or booking.', 422);
+      requireState(audience !== 'SELECTED_CUSTOMER' || b.customerId || b.bookingId, 'DOCUMENT_CUSTOMER_REQUIRED', 'Select a customer or booking for this document.', 422);
+      if (audience === 'SELECTED_CUSTOMER' && b.customerId) requireState(ctx.actor.permissions.has('customers.view_sensitive'), 'FORBIDDEN', 'Sensitive customer document permission is required.', 403);
       const file = found(req.file);
       const detected = await fileTypeFromBuffer(file.buffer);
       const extension = path.extname(file.originalname).toLowerCase();
@@ -129,7 +134,9 @@ export function documentRoutes(app: Express) {
       return transaction(async (tx) => {
         const document = await tx.document.create({
           data: {
-            ...b,
+            ...fields,
+            allProjectCustomers: audience === 'ALL_PROJECT_CUSTOMERS',
+            portalVisible: audience !== 'STAFF_ONLY',
             projectId: ctx.projectId,
             key,
             name: b.name.toLowerCase().endsWith(extension) ? b.name : b.name + extension,

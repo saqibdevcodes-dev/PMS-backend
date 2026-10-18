@@ -12,89 +12,25 @@ import {
   id,
   idempotencyKey,
 } from '../../common/http.js';
-import { money, positiveMoney, decimal } from '../../common/money.js';
-import { found, requireState } from '../../common/errors.js';
+import { positiveMoney, sum, decimal } from '../../common/money.js';
+import { found } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
-import { requestApproval } from '../approvals/service.js';
-import { scopedUnit } from '../inventory/service.js';
 import * as sales from './service.js';
+import { bookingInput, paymentTerms } from './payment-plan.js';
 const root = '/projects/:projectId';
 export function salesRoutes(app: Express) {
-  endpoint(
-    app,
-    'post',
-    root + '/reservations',
-    {
-      permission: 'reservations.create',
-      summary: 'Reserve available inventory with concurrency protection',
-      body: z.object({ unitId: uuid, customerId: uuid }).strict(),
-      status: 201,
-    },
-    async (ctx, b) => sales.reserve(ctx, b),
-  );
-  endpoint(
-    app,
-    'get',
-    root + '/reservations',
-    { permission: 'bookings.read', summary: 'List reservations', query: pageQuery },
-    async (ctx, _b, q) => {
-      const where: Prisma.ReservationWhereInput = { unit: { projectId: ctx.projectId } };
-      const [items, total] = await Promise.all([
-        db.reservation.findMany({ where, ...pagination(q), orderBy: { createdAt: q.sort } }),
-        db.reservation.count({ where }),
-      ]);
-      return paged(items, total, q);
-    },
-  );
-  endpoint(
-    app,
-    'post',
-    root + '/reservations/:id/release',
-    {
-      permission: 'reservations.create',
-      summary: 'Release your own unfinished booking hold to change customer or property',
-    },
-    async (ctx, _b, _q, req) => sales.cancelReservation(ctx, id(req), true),
-  );
-  endpoint(
-    app,
-    'post',
-    root + '/reservations/:id/cancel',
-    {
-      permission: 'reservations.cancel',
-      summary: 'Cancel active reservation and release inventory',
-    },
-    async (ctx, _b, _q, req) => sales.cancelReservation(ctx, id(req)),
-  );
-  endpoint(
-    app,
-    'post',
-    root + '/units/:id/discount-requests',
-    {
-      permission: 'discounts.request',
-      summary: 'Request a specific discount amount',
-      body: z.object({ amount: positiveMoney }).strict(),
-    },
-    async (ctx, b, _q, req) =>
-      transaction(async (tx) => {
-        const unit = await scopedUnit(tx, ctx, id(req));
-        requireState(
-          decimal(b.amount).lt(unit.price.plus(unit.charges)),
-          'INVALID_DISCOUNT',
-          'Discount must be less than gross price.',
-          422,
-        );
-        return requestApproval(tx, ctx, 'DISCOUNT', unit.id, b.amount, b);
-      }),
-  );
+  endpoint(app, 'post', root + '/installments/:id/payment', {
+    permission: 'payments.create', summary: 'Receive the next installment; approve cash or queue bank/cheque verification; requires Idempotency-Key',
+    body: z.object({ expectedAmount: positiveMoney, method: z.enum(['CASH','CHEQUE','BANK_TRANSFER']), paidAt: z.iso.datetime(), transactionReference: z.string().trim().min(1).max(200).optional(), proofImageId: uuid.optional(), receivingAccountId: uuid.optional() }).strict(),
+  }, async (ctx, body, _q, req) => sales.collectInstallment(ctx, id(req), body, idempotencyKey(req)));
   endpoint(
     app,
     'post',
     root + '/payment-plans',
     {
       permission: 'plans.manage',
-      summary: 'Create immutable payment plan version',
-      body: z.object({ name: z.string().min(2).max(200), schedule: sales.scheduleSchema }).strict(),
+      summary: 'Save payment plan defaults',
+      body: z.object({ name: z.string().min(2).max(200), ...paymentTerms.shape }).strict(),
     },
     async (ctx, b) =>
       transaction(async (tx) => {
@@ -103,7 +39,11 @@ export function salesRoutes(app: Express) {
             projectId: ctx.projectId,
             name: b.name,
             versions: {
-              create: { version: 1, schedule: sales.planData(b.schedule), createdBy: ctx.actor.id },
+              create: {
+                version: 1,
+                schedule: JSON.parse(JSON.stringify(b)),
+                createdBy: ctx.actor.id,
+              },
             },
           },
           include: { versions: true },
@@ -118,8 +58,8 @@ export function salesRoutes(app: Express) {
     root + '/payment-plans/:id/versions',
     {
       permission: 'plans.manage',
-      summary: 'Add new plan version without changing existing bookings',
-      body: z.object({ schedule: sales.scheduleSchema }).strict(),
+      summary: 'Update payment plan defaults without changing existing bookings',
+      body: paymentTerms,
     },
     async (ctx, b, _q, req) =>
       transaction(async (tx) => {
@@ -134,7 +74,7 @@ export function salesRoutes(app: Express) {
           data: {
             planId: id(req),
             version: latest.version + 1,
-            schedule: sales.planData(b.schedule),
+            schedule: JSON.parse(JSON.stringify(b)),
             createdBy: ctx.actor.id,
           },
         });
@@ -172,28 +112,8 @@ export function salesRoutes(app: Express) {
     root + '/bookings',
     {
       permission: 'bookings.create',
-      summary: 'Convert valid reservation into booking and installments',
-      body: z
-        .object({
-          reservationId: uuid,
-          planVersionId: uuid,
-          discount: money.default('0'),
-          discountApprovalId: uuid.optional(),
-          dealerId: uuid.optional(),
-          owners: z
-            .array(
-              z
-                .object({
-                  customerId: uuid,
-                  share: positiveMoney.refine((v) => decimal(v).lte(100)),
-                })
-                .strict(),
-            )
-            .min(1)
-            .max(20)
-            .optional(),
-        })
-        .strict(),
+      summary: 'Create a booking with a full payment or installment plan',
+      body: bookingInput,
       status: 201,
     },
     async (ctx, b) => sales.createBooking(ctx, b),
@@ -214,10 +134,24 @@ export function salesRoutes(app: Express) {
         ...(q.search ? { reference: { contains: q.search, mode: 'insensitive' } } : {}),
       };
       const [items, total] = await Promise.all([
-        db.booking.findMany({ where, ...pagination(q), orderBy: { createdAt: q.sort } }),
+        db.booking.findMany({
+          where,
+          include: {
+            customer: { select: { id: true, name: true, phone: true } },
+            unit: { select: { id: true, number: true, type: true, size: true, measurementUnit: true, phase: true, block: true } },
+            payments: { where: { status: { in: ['CLEARED', 'PENDING'] } }, select: { amount: true, status: true } },
+            installments: { where: { superseded: false }, orderBy: [{ dueDate: 'asc' }, { sequence: 'asc' }], select: { amount: true, dueDate: true, allocations: { where: { reversedAt: null }, select: { amount: true } } } },
+          },
+          ...pagination(q),
+          orderBy: { createdAt: q.sort },
+        }),
         db.booking.count({ where }),
       ]);
-      return paged(items, total, q);
+      return paged(items.map(({ payments, installments, ...booking }) => {
+        const paid = sum(payments.filter(p => p.status === 'CLEARED').map(p => p.amount));
+        const next = installments.find(i => i.amount.gt(sum(i.allocations.map(a => a.amount))));
+        return { ...booking, paid: paid.toFixed(2), outstanding: decimal(booking.total).minus(paid).clamp(0, booking.total).toFixed(2), pendingPayments: payments.filter(p => p.status === 'PENDING').length, nextDue: next?.dueDate ?? null };
+      }), total, q);
     },
   );
   endpoint(
@@ -228,11 +162,13 @@ export function salesRoutes(app: Express) {
     async (ctx, _b, _q, req) =>
       transaction(async (tx) => {
         const booking = await sales.scopedBooking(tx, ctx, id(req));
-        const project = found(await tx.project.findUnique({ where: { id: ctx.projectId } }));
         return {
           ...booking,
-          owners: await tx.bookingOwner.findMany({ where: { bookingId: booking.id } }),
-          position: await sales.bookingPosition(tx, booking.id, new Date(), project.graceDays),
+          owners: await tx.bookingOwner.findMany({
+            where: { bookingId: booking.id },
+            include: { customer: { select: { name: true } } },
+          }),
+          position: await sales.bookingPosition(tx, booking.id, new Date()),
           revisions: await tx.scheduleRevision.findMany({ where: { bookingId: booking.id } }),
         };
       }),
@@ -243,39 +179,28 @@ export function salesRoutes(app: Express) {
     root + '/bookings/:id/confirm',
     {
       permission: 'bookings.approve',
-      summary: 'Confirm approved booking after cleared down payment',
-      body: z.object({ approvalId: uuid }).strict(),
+      summary: 'Confirm booking',
     },
-    async (ctx, b, _q, req) => sales.confirmBooking(ctx, id(req), b.approvalId),
+    async (ctx, b, _q, req) => sales.confirmBooking(ctx, id(req)),
   );
   const revisionBody = z
-    .object({ reason: z.string().min(3).max(1000), schedule: sales.revisedSchedule })
+    .object({
+      reason: z.string().min(3).max(1000),
+      installmentCount: z.number().int().min(1).max(360),
+      intervalMonths: z.number().int().min(1).max(12),
+      firstInstallmentDate: z.iso.date(),
+    })
     .strict();
-  endpoint(
-    app,
-    'post',
-    root + '/bookings/:id/reschedule-requests',
-    {
-      permission: 'bookings.create',
-      summary: 'Request revision of unpaid installment schedule',
-      body: revisionBody,
-    },
-    async (ctx, b, _q, req) =>
-      transaction(async (tx) => {
-        const booking = await sales.scopedBooking(tx, ctx, id(req));
-        return requestApproval(tx, ctx, 'RESCHEDULE', booking.id, booking.total.toFixed(2), b);
-      }),
-  );
   endpoint(
     app,
     'post',
     root + '/bookings/:id/reschedule',
     {
       permission: 'bookings.approve',
-      summary: 'Apply approved revision retaining paid installment history',
-      body: revisionBody.extend({ approvalId: uuid }),
+      summary: 'Save payment plan and retain paid installment history',
+      body: revisionBody,
     },
-    async (ctx, b, _q, req) => sales.reschedule(ctx, id(req), b.approvalId, b.reason, b.schedule),
+    async (ctx, b, _q, req) => sales.reschedule(ctx, id(req), b.reason, b),
   );
   endpoint(
     app,
@@ -293,7 +218,7 @@ export function salesRoutes(app: Express) {
           transactionReference: z.string().max(200).optional(),
           proofImageId: uuid.optional(),
           methodDetails: z.string().trim().min(2).max(200).optional(),
-          receivingAccountId: uuid,
+          receivingAccountId: uuid.optional(),
         })
         .strict(),
       status: 201,
@@ -330,7 +255,10 @@ export function salesRoutes(app: Express) {
         db.payment.findMany({
           where,
           ...pagination(q),
-          include: { receipt: true },
+          include: {
+            receipt: true,
+            booking: { select: { reference: true, customer: { select: { name: true } } } },
+          },
           orderBy: { createdAt: q.sort },
         }),
         db.payment.count({ where }),
@@ -358,26 +286,6 @@ export function salesRoutes(app: Express) {
   endpoint(
     app,
     'post',
-    root + '/payments/:id/reversal-requests',
-    { permission: 'payments.reverse', summary: 'Request payment reversal' },
-    async (ctx, _b, _q, req) =>
-      transaction(async (tx) => {
-        const p = found(
-          await tx.payment.findFirst({
-            where: { id: id(req), booking: { unit: { projectId: ctx.projectId } } },
-          }),
-        );
-        requireState(
-          p.status === 'CLEARED',
-          'PAYMENT_NOT_CLEARED',
-          'Only cleared payments can be reversed.',
-        );
-        return requestApproval(tx, ctx, 'PAYMENT_REVERSAL', p.id, p.amount.toFixed(2));
-      }),
-  );
-  endpoint(
-    app,
-    'post',
     root + '/payments/:id/allocate-advance',
     {
       permission: 'payments.verify',
@@ -392,9 +300,9 @@ export function salesRoutes(app: Express) {
     {
       permission: 'payments.reverse',
       summary: 'Reverse payment, receipt, allocations and journal atomically',
-      body: z.object({ approvalId: uuid, reason: z.string().min(3).max(1000) }).strict(),
+      body: z.object({ reason: z.string().min(3).max(1000) }).strict(),
     },
-    async (ctx, b, _q, req) => sales.reversePayment(ctx, id(req), b.approvalId, b.reason),
+    async (ctx, b, _q, req) => sales.reversePayment(ctx, id(req), b.reason),
   );
   endpoint(
     app,
@@ -405,7 +313,13 @@ export function salesRoutes(app: Express) {
       found(
         await db.receipt.findFirst({
           where: { id: id(req), payment: { booking: { unit: { projectId: ctx.projectId } } } },
-          include: { payment: true },
+          include: {
+            payment: {
+              include: {
+                booking: { select: { reference: true, customer: { select: { name: true } } } },
+              },
+            },
+          },
         }),
       ),
   );

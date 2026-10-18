@@ -39,7 +39,11 @@ export async function requireImage(
             !!(await tx.project.findFirst({
               where: {
                 id: ctx.projectId,
-                OR: [{ photoId: image.id }, { photoIds: { has: image.id } }],
+                OR: [
+                  { photoId: image.id },
+                  { photoIds: { has: image.id } },
+                  { featureImages: { array_contains: [{ imageId: image.id }] } },
+                ],
               },
             })))),
     'IMAGE_SCOPE_MISMATCH',

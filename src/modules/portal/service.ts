@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
-import { db } from '../../database/client.js';
+import { db, type Tx } from '../../database/client.js';
 import { found } from '../../common/errors.js';
 import { decimal, sum } from '../../common/money.js';
 import { ownedBookings } from './access.js';
@@ -34,6 +34,7 @@ export const bookingSelect = {
   },
 } satisfies Prisma.BookingSelect;
 export const documentSelect = {
+  allProjectCustomers: true,
   id: true,
   name: true,
   mime: true,
@@ -43,19 +44,26 @@ export const documentSelect = {
   project: { select: projectSelect },
 } satisfies Prisma.DocumentSelect;
 
-export async function financialPosition(where: Prisma.BookingWhereInput, today: Date) {
+export async function financialPosition(
+  where: Prisma.BookingWhereInput,
+  today: Date,
+  client: Tx = db,
+) {
   const installments = { booking: where, superseded: false };
   const overdue = { ...installments, dueDate: { lt: today } };
   const [bookings, payments, scheduled, allocated, due, duePaid] = await Promise.all([
-    db.booking.aggregate({ where, _sum: { total: true }, _count: true }),
-    db.payment.aggregate({ where: { booking: where, status: 'CLEARED' }, _sum: { amount: true } }),
-    db.installment.aggregate({ where: installments, _sum: { amount: true } }),
-    db.paymentAllocation.aggregate({
+    client.booking.aggregate({ where, _sum: { total: true }, _count: true }),
+    client.payment.aggregate({
+      where: { booking: where, status: 'CLEARED' },
+      _sum: { amount: true },
+    }),
+    client.installment.aggregate({ where: installments, _sum: { amount: true } }),
+    client.paymentAllocation.aggregate({
       where: { installment: installments, reversedAt: null },
       _sum: { amount: true },
     }),
-    db.installment.aggregate({ where: overdue, _sum: { amount: true } }),
-    db.paymentAllocation.aggregate({
+    client.installment.aggregate({ where: overdue, _sum: { amount: true } }),
+    client.paymentAllocation.aggregate({
       where: { installment: overdue, reversedAt: null },
       _sum: { amount: true },
     }),

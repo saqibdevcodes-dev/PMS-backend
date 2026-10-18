@@ -4,6 +4,20 @@
       "name": "User",
       "fields": [
         {
+          "name": "credentialsIssuedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "firstLoginAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
           "name": "photoId",
           "type": "String",
           "kind": "scalar",
@@ -508,6 +522,34 @@
     {
       "name": "Project",
       "fields": [
+        {
+          "name": "location",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "features",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "featureImages",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
         {
           "name": "photoIds",
           "type": "String",
@@ -1025,6 +1067,13 @@
     {
       "name": "Customer",
       "fields": [
+        {
+          "name": "identityType",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
         {
           "name": "photoId",
           "type": "String",
@@ -1764,6 +1813,20 @@
       "name": "Booking",
       "fields": [
         {
+          "name": "paymentType",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paymentTerms",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
           "name": "id",
           "type": "String",
           "kind": "scalar",
@@ -1796,14 +1859,14 @@
           "type": "String",
           "kind": "scalar",
           "isList": false,
-          "isRequired": true
+          "isRequired": false
         },
         {
           "name": "planVersionId",
           "type": "String",
           "kind": "scalar",
           "isList": false,
-          "isRequired": true
+          "isRequired": false
         },
         {
           "name": "dealerId",
@@ -1915,14 +1978,14 @@
           "type": "Reservation",
           "kind": "object",
           "isList": false,
-          "isRequired": true
+          "isRequired": false
         },
         {
           "name": "planVersion",
           "type": "PaymentPlanVersion",
           "kind": "object",
           "isList": false,
-          "isRequired": true
+          "isRequired": false
         },
         {
           "name": "dealer",
@@ -3169,7 +3232,14 @@
           "type": "String",
           "kind": "scalar",
           "isList": false,
-          "isRequired": true
+          "isRequired": false
+        },
+        {
+          "name": "verification",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
         },
         {
           "name": "charges",
@@ -3232,7 +3302,7 @@
           "type": "Ndc",
           "kind": "object",
           "isList": false,
-          "isRequired": true
+          "isRequired": false
         }
       ]
     },
@@ -3420,6 +3490,27 @@
         {
           "name": "handoverAt",
           "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "verification",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "handoverReference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "receivedByName",
+          "type": "String",
           "kind": "scalar",
           "isList": false,
           "isRequired": false
@@ -3973,6 +4064,13 @@
     {
       "name": "Document",
       "fields": [
+        {
+          "name": "allProjectCustomers",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
         {
           "name": "portalVisible",
           "type": "Boolean",
