@@ -345,7 +345,7 @@ export function dealerRoutes(app: Express) {
         );
         const unitId = uuid.parse(req.params.unitId);
 
-        const allocation = found(
+        found(
           await tx.dealerAllocation.findUnique({
             where: { dealerId_unitId: { dealerId: dealer.id, unitId } },
           }),
