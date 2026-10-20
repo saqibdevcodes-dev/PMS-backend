@@ -24,6 +24,7 @@ import { crmRoutes } from './modules/crm/routes.js';
 import { financeRoutes } from './modules/finance/routes.js';
 import { reportRoutes } from './modules/reports/routes.js';
 import { documentRoutes } from './modules/documents/routes.js';
+import { verificationRoutes } from './modules/sales/verification-routes.js';
 import { buildOpenApi } from './docs/openapi.js';
 export const logger = pino({
   level: env.NODE_ENV === 'test' ? 'silent' : 'info',
@@ -151,6 +152,7 @@ export function createApp() {
   imageRoutes(app);
   foundationRoutes(app);
   salesRoutes(app);
+  verificationRoutes(app);
   workflowRoutes(app);
   crmRoutes(app);
   financeRoutes(app);
@@ -232,6 +234,9 @@ export function createApp() {
           requestId: res.locals.requestId,
           path: req.path,
           errorType: error instanceof Error ? error.name : 'Unknown',
+          errorCode: (error as Record<string, unknown>)?.code,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          meta: (error as Record<string, unknown>)?.meta,
         },
         'Unhandled request error',
       );

@@ -65,6 +65,7 @@ export function documentRoutes(app: Express) {
             .regex(/^[^\\/\x00-\x1f]+$/),
           customerId: uuid.optional(),
           bookingId: uuid.optional(),
+          userId: uuid.optional(),
           audience: z
             .enum(['STAFF_ONLY', 'SELECTED_CUSTOMER', 'ALL_PROJECT_CUSTOMERS'])
             .default('STAFF_ONLY'),
@@ -96,20 +97,33 @@ export function documentRoutes(app: Express) {
       const file = found(req.file);
       const detected = await fileTypeFromBuffer(file.buffer);
       const extension = path.extname(file.originalname).toLowerCase();
+      const allowedExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.docx', '.doc'];
+      const allowedMimes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/msword',
+        'application/zip',
+      ];
+      const valid =
+        allowedExts.includes(extension) &&
+        (detected ? allowedMimes.includes(detected.mime) : extension === '.docx' || extension === '.doc');
       requireState(
-        detected &&
-          ['application/pdf', 'image/jpeg', 'image/png'].includes(detected.mime) &&
-          (
-            {
-              'application/pdf': ['.pdf'],
-              'image/jpeg': ['.jpg', '.jpeg'],
-              'image/png': ['.png'],
-            } as Record<string, string[]>
-          )[detected.mime]!.includes(extension),
+        valid,
         'INVALID_FILE_TYPE',
-        'Upload a valid PDF, JPEG or PNG with a matching extension.',
+        'Upload a valid PDF, Word document (DOCX), or image (PNG, JPG, WEBP) with a matching extension.',
         422,
       );
+      const finalMime =
+        extension === '.docx'
+          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          : extension === '.doc'
+            ? 'application/msword'
+            : detected
+              ? detected.mime
+              : 'application/octet-stream';
       if (b.customerId)
         found(
           await db.customer.findFirst({ where: { id: b.customerId, projectId: ctx.projectId } }),
@@ -148,7 +162,7 @@ export function documentRoutes(app: Express) {
         );
       }
       const key = `projects/${ctx.projectId}/documents/${randomUUID()}${extension}`;
-      await putObject(key, file.buffer, detected.mime);
+      await putObject(key, file.buffer, finalMime);
       return transaction(async (tx) => {
         const document = await tx.document.create({
           data: {
@@ -158,7 +172,7 @@ export function documentRoutes(app: Express) {
             projectId: ctx.projectId,
             key,
             name: b.name.toLowerCase().endsWith(extension) ? b.name : b.name + extension,
-            mime: detected.mime,
+            mime: finalMime,
             size: file.size,
             sha256: createHash('sha256').update(file.buffer).digest('hex'),
             uploadedBy: ctx.actor.id,
@@ -176,16 +190,68 @@ export function documentRoutes(app: Express) {
     {
       permission: 'documents.read',
       summary: 'List private document metadata',
-      query: pageQuery.extend({ customerId: uuid.optional(), bookingId: uuid.optional() }),
+      query: pageQuery.extend({
+        customerId: uuid.optional(),
+        bookingId: uuid.optional(),
+        userId: uuid.optional(),
+      }),
     },
     async (ctx, _b, q) => {
-      const where = { projectId: ctx.projectId, customerId: q.customerId, bookingId: q.bookingId };
+      const where = {
+        projectId: ctx.projectId,
+        ...(q.customerId ? { customerId: q.customerId } : {}),
+        ...(q.bookingId ? { bookingId: q.bookingId } : {}),
+        ...(q.userId ? { userId: q.userId } : {}),
+      };
       const [items, total] = await Promise.all([
         db.document.findMany({ where, ...pagination(q), orderBy: { createdAt: q.sort } }),
         db.document.count({ where }),
       ]);
       return paged(items, total, q);
     },
+  );
+  endpoint(
+    app,
+    'delete',
+    root + '/documents/:id',
+    { permission: 'documents.manage', summary: 'Delete a document' },
+    async (ctx, _b, _q, req) =>
+      transaction(async (tx) => {
+        const document = found(
+          await tx.document.findFirst({ where: { id: id(req), projectId: ctx.projectId } }),
+        );
+        await tx.document.delete({ where: { id: document.id } });
+        await audit(tx, ctx, 'document.deleted', document.id);
+        return { deleted: true };
+      }),
+  );
+  endpoint(
+    app,
+    'get',
+    '/users/:id/documents',
+    { permission: 'users.manage', summary: 'List all documents for an employee' },
+    async (_ctx, _b, _q, req) => {
+      const documents = await db.document.findMany({
+        where: { userId: id(req) },
+        include: { project: { select: { id: true, name: true, code: true } } },
+        orderBy: { createdAt: 'desc' },
+      });
+      return documents;
+    },
+  );
+  endpoint(
+    app,
+    'delete',
+    '/users/:id/documents/:documentId',
+    { permission: 'users.manage', summary: 'Delete an employee document' },
+    async (ctx, _b, _q, req) =>
+      transaction(async (tx) => {
+        const docId = uuid.parse(req.params.documentId);
+        const document = found(await tx.document.findFirst({ where: { id: docId, userId: id(req) } }));
+        await tx.document.delete({ where: { id: document.id } });
+        await audit(tx, ctx, 'document.deleted', document.id);
+        return { deleted: true };
+      }),
   );
   endpoint(
     app,

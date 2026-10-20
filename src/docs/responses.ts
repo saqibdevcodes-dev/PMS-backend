@@ -59,20 +59,47 @@ export function responseSchema(path: string, method: string, hasPagination: bool
     });
   if (path === '/roles' && method === 'get')
     return object({ roles: array(ref('Role')), permissions: array(str) });
+  if (path === '/verify/file/:reference')
+    return object({
+      valid: bool,
+      reference: str,
+      verifiedAt: str,
+    });
+  if (path === '/verify/employee/:id' || path === '/verify/customer/:id')
+    return object({
+      valid: bool,
+      verifiedAt: str,
+    });
+  if (path.endsWith('/users/:id/documents')) return array(ref('Document'));
+  if (path.endsWith('/users/:id/ledger')) {
+    if (method === 'post') return ref('EmployeeLedgerEntry');
+    return ref('EmployeeLedger');
+  }
   if (path.endsWith('/dashboard'))
     return object({
       asOf: { type: 'string', format: 'date-time' },
       currency: str,
       timezone: str,
+      totalProjects: num,
       inventory: { type: 'object', additionalProperties: num },
       totalInventory: num,
+      availableProperties: num,
+      bookedProperties: num,
+      soldProperties: num,
       confirmedBookings: num,
       netSales: ref('Money'),
+      totalSalesValue: ref('Money'),
       verifiedCollections: ref('Money'),
+      totalReceived: ref('Money'),
       outstanding: ref('Money'),
+      totalOutstanding: ref('Money'),
+      totalReceivables: ref('Money'),
       overdue: ref('Money'),
+      overdueInstallments: num,
       defaulterCount: num,
       upcomingInstallments: num,
+      upcomingAmount: ref('Money'),
+      activeDealers: num,
     });
   if (path.endsWith('/reports')) {
     const schema = object({
@@ -274,5 +301,33 @@ export const extraSchemas = {
     unallocated: ref('Money'),
     outstanding: ref('Money'),
     overdue: ref('Money'),
+  }),
+  EmployeeLedger: object({
+    employee: object({
+      id: str,
+      name: str,
+      email: str,
+      active: bool,
+      roles: array(str),
+      createdAt: str,
+    }),
+    metrics: object({ totalDebit: str, totalCredit: str, balance: str, entryCount: num }),
+    entries: array(
+      object({
+        id: str,
+        date: str,
+        reference: str,
+        type: str,
+        description: str,
+        debit: str,
+        credit: str,
+        runningBalance: str,
+        paymentMethod: { type: 'string', nullable: true },
+        status: str,
+        projectId: { type: 'string', nullable: true },
+        projectName: { type: 'string', nullable: true },
+        createdAt: str,
+      }),
+    ),
   }),
 };

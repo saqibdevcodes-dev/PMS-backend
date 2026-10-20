@@ -16,6 +16,7 @@ export const paymentTerms = z
 export const bookingInput = paymentTerms.extend({
   customerId: z.uuid(),
   unitId: z.uuid(),
+  dealerId: z.uuid().optional(),
   sellingPrice: positiveMoney.optional(),
   discount: money.default('0'),
   confirm: z.boolean().default(false),

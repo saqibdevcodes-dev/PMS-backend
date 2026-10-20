@@ -14,7 +14,7 @@ export type StatementSection = {
 };
 export type AccountStatement = {
   project: { name: string; currency: string; timezone: string };
-  customer: { name: string; reference: string; email?: string | null; phone?: string | null };
+  customer: { id?: string; name: string; reference: string; email?: string | null; phone?: string | null };
   generatedAt: string;
   reference?: string;
   from?: string;

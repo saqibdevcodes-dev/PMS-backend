@@ -15,6 +15,8 @@ export const reportKinds = [
   'installments',
   'outstanding',
   'ageing',
+  'defaulters',
+  'dealer-sales',
   'customer-statement',
   'cancellations',
   'refunds',
@@ -133,7 +135,14 @@ async function queryReport(
         },
         include: {
           allocations: { where: { reversedAt: null } },
-          booking: { select: { reference: true, customerId: true } },
+          booking: {
+            select: {
+              reference: true,
+              customerId: true,
+              customer: { select: { name: true, phone: true } },
+              unit: { select: { number: true, type: true } },
+            },
+          },
         },
         take,
         orderBy: { dueDate: 'asc' },
@@ -168,6 +177,12 @@ async function queryReport(
             bookingId: r.bookingId,
             reference: r.booking.reference,
             customerId: r.booking.customerId,
+            customerName: r.booking.customer?.name ?? '',
+            customerPhone: r.booking.customer?.phone ?? '',
+            unitNumber: r.booking.unit?.number ?? '',
+            unitType: r.booking.unit?.type ?? '',
+            label: r.label,
+            sequence: r.sequence,
             dueDate: r.dueDate.toISOString().slice(0, 10),
             amount: r.amount.toFixed(2),
             paid: paid.toFixed(2),
@@ -182,6 +197,133 @@ async function queryReport(
             q.kind === 'installments' ||
             (decimal(r.outstanding).gt(0) && (q.kind !== 'ageing' || r.lateDays > 0)),
         );
+    }
+    case 'defaulters': {
+      const rows = await tx.installment.findMany({
+        where: {
+          booking: { ...bookingWhere, status: { not: 'CANCELLED' } },
+          superseded: false,
+        },
+        include: {
+          allocations: { where: { reversedAt: null } },
+          booking: {
+            select: {
+              reference: true,
+              customerId: true,
+              customer: { select: { name: true, phone: true } },
+              unit: { select: { number: true, type: true } },
+              recovery: { select: { status: true }, take: 1 },
+            },
+          },
+        },
+        orderBy: { dueDate: 'asc' },
+      });
+      const today = DateTime.now().setZone(project.timezone).toISODate()!;
+      const now = new Date(today).getTime();
+
+      const map = new Map<
+        string,
+        {
+          bookingId: string;
+          reference: string;
+          customerId: string;
+          customerName: string;
+          customerPhone: string;
+          propertyNumber: string;
+          propertyType: string;
+          overdueInstallmentsCount: number;
+          overdueAmount: Prisma.Decimal;
+          totalOutstanding: Prisma.Decimal;
+          oldestDueDate: string;
+          daysOverdue: number;
+          collectionStatus: string;
+        }
+      >();
+
+      for (const r of rows) {
+        const paid = sum(r.allocations.map((a) => a.amount));
+        const due = r.amount.minus(paid);
+        if (due.lte(0)) continue;
+        const lateDays = Math.max(0, Math.floor((now - r.dueDate.getTime()) / 86400000));
+        let item = map.get(r.bookingId);
+        if (!item) {
+          item = {
+            bookingId: r.bookingId,
+            reference: r.booking.reference,
+            customerId: r.booking.customerId,
+            customerName: r.booking.customer?.name ?? '',
+            customerPhone: r.booking.customer?.phone ?? '',
+            propertyNumber: r.booking.unit?.number ?? '',
+            propertyType: r.booking.unit?.type ?? '',
+            overdueInstallmentsCount: 0,
+            overdueAmount: decimal(0),
+            totalOutstanding: decimal(0),
+            oldestDueDate: '',
+            daysOverdue: 0,
+            collectionStatus: r.booking.recovery[0]?.status ?? 'OVERDUE',
+          };
+          map.set(r.bookingId, item);
+        }
+        item.totalOutstanding = item.totalOutstanding.plus(due);
+        if (lateDays > 0) {
+          item.overdueInstallmentsCount += 1;
+          item.overdueAmount = item.overdueAmount.plus(due);
+          if (lateDays > item.daysOverdue) item.daysOverdue = lateDays;
+          const dueStr = r.dueDate.toISOString().slice(0, 10);
+          if (!item.oldestDueDate || dueStr < item.oldestDueDate) item.oldestDueDate = dueStr;
+        }
+      }
+
+      return [...map.values()]
+        .filter((d) => d.overdueInstallmentsCount > 0 && d.overdueAmount.gt(0))
+        .map((d) => ({
+          bookingId: d.bookingId,
+          reference: d.reference,
+          customerId: d.customerId,
+          customerName: d.customerName,
+          customerPhone: d.customerPhone,
+          propertyNumber: d.propertyNumber,
+          propertyType: d.propertyType,
+          overdueInstallmentsCount: d.overdueInstallmentsCount,
+          overdueAmount: d.overdueAmount.toFixed(2),
+          totalOutstanding: d.totalOutstanding.toFixed(2),
+          oldestDueDate: d.oldestDueDate,
+          daysOverdue: d.daysOverdue,
+          collectionStatus: d.collectionStatus,
+        }));
+    }
+    case 'dealer-sales': {
+      const dealers = await tx.dealer.findMany({
+        where: { projectId },
+        include: {
+          allocations: { select: { unitId: true } },
+          bookings: {
+            where: { unit: { projectId }, status: 'CONFIRMED' },
+            select: { total: true },
+          },
+          commissions: { select: { amount: true, status: true } },
+        },
+      });
+      return dealers.map((d) => {
+        const totalSales = sum(d.bookings.map((b) => b.total));
+        const totalCommission = sum(d.commissions.map((c) => c.amount));
+        const settledCommission = sum(
+          d.commissions.filter((c) => c.status === 'COMPLETED').map((c) => c.amount),
+        );
+        return {
+          dealerId: d.id,
+          name: d.name,
+          phone: d.phone,
+          active: d.active,
+          commissionPercent: d.commissionPercent.toFixed(2),
+          assignedProperties: d.allocations.length,
+          soldProperties: d.bookings.length,
+          totalSalesValue: totalSales.toFixed(2),
+          totalCommission: totalCommission.toFixed(2),
+          commissionPaid: settledCommission.toFixed(2),
+          commissionPending: totalCommission.minus(settledCommission).toFixed(2),
+        };
+      });
     }
     case 'cancellations':
       return (await tx.cancellation.findMany({ where: { booking: bookingWhere }, take })).map(flat);
@@ -352,6 +494,7 @@ export async function dashboard(projectId: string, phase?: string) {
   if (cached) return JSON.parse(cached) as unknown;
   const result = await transaction(async (tx) => {
     const project = found(await tx.project.findUnique({ where: { id: projectId } }));
+    const totalProjects = await tx.project.count();
     const unit = { projectId, phase };
     const inventory = await tx.unit.groupBy({ by: ['status'], where: unit, _count: true });
     const sales = await tx.booking.aggregate({
@@ -378,19 +521,38 @@ export async function dashboard(projectId: string, phase?: string) {
     const upcoming = dueRows.filter(
       (r) => r.lateDays === 0 && decimal(String(r.outstanding)).gt(0),
     );
+    const upcomingAmount = sum(upcoming.map((r) => String(r.outstanding)));
+
+    const availableCount = inventory.find((i) => i.status === 'AVAILABLE')?._count ?? 0;
+    const bookedCount = inventory.find((i) => i.status === 'BOOKED')?._count ?? 0;
+    const soldCount = inventory.find((i) => i.status === 'SOLD')?._count ?? 0;
+
+    const dealerCount = await tx.dealer.count({ where: { projectId, active: true } });
+
     return {
       asOf: new Date().toISOString(),
       currency: project.currency,
       timezone: project.timezone,
+      totalProjects,
       inventory: Object.fromEntries(inventory.map((i) => [i.status, i._count])),
       totalInventory: inventory.reduce((s, i) => s + i._count, 0),
+      availableProperties: availableCount,
+      bookedProperties: bookedCount,
+      soldProperties: soldCount,
       confirmedBookings: sales._count,
       netSales: sales._sum.total?.toFixed(2) ?? '0.00',
+      totalSalesValue: sales._sum.total?.toFixed(2) ?? '0.00',
       verifiedCollections: collections._sum.amount?.toFixed(2) ?? '0.00',
+      totalReceived: collections._sum.amount?.toFixed(2) ?? '0.00',
       outstanding: outstanding.toFixed(2),
+      totalOutstanding: outstanding.toFixed(2),
+      totalReceivables: outstanding.toFixed(2),
       overdue: overdue.toFixed(2),
+      overdueInstallments: dueRows.filter((r) => decimal(String(r.overdue)).gt(0)).length,
       defaulterCount: defaulters,
       upcomingInstallments: upcoming.length,
+      upcomingAmount: upcomingAmount.toFixed(2),
+      activeDealers: dealerCount,
     };
   });
   await redis.set(cacheKey, JSON.stringify(result), 'EX', 15);
@@ -400,8 +562,8 @@ export async function queueExport(
   ctx: Context,
   input: { report: ReportQuery; format: 'xlsx' | 'pdf' },
 ) {
-  return transaction(async (tx) => {
-    const job = await tx.backgroundJob.create({
+  const job = await transaction(async (tx) => {
+    const j = await tx.backgroundJob.create({
       data: {
         projectId: ctx.projectId,
         createdBy: ctx.actor.id,
@@ -409,8 +571,15 @@ export async function queueExport(
         payload: json(input),
       },
     });
-    await outbox(tx, 'export', { jobId: job.id });
-    await audit(tx, ctx, 'report.export_requested', job.id, { kind: input.report.kind });
-    return job;
+    await outbox(tx, 'export', { jobId: j.id });
+    await audit(tx, ctx, 'report.export_requested', j.id, { kind: input.report.kind });
+    return j;
   });
+
+  // Ensure artifact is generated immediately so single-process dev and web servers fulfill downloads seamlessly
+  import('../../jobs/artifacts.js')
+    .then((m) => m.generateArtifact(job.id))
+    .catch(() => {});
+
+  return job;
 }

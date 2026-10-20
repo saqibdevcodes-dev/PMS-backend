@@ -17,7 +17,7 @@ export async function scopedBooking(tx: Tx, ctx: Context, id: string) {
       where: { id, unit: { projectId: ctx.projectId } },
       include: {
         unit: true,
-        customer: { select: { id: true, name: true } },
+        customer: { select: { id: true, reference: true, name: true, fatherName: true, phone: true } },
         owners: { where: { validTo: null } },
       },
     }),
@@ -86,11 +86,21 @@ export async function createBooking(ctx: Context, input: z.infer<typeof bookingI
     const project = found(await tx.project.findUnique({ where: { id: ctx.projectId } }));
     const today = DateTime.now().setZone(project.timezone).toISODate()!;
     const calculated = calculatePaymentPlan(total, input, project.downPaymentPercent, today);
+    let dealerCommission: Prisma.Decimal | undefined;
+    if (input.dealerId) {
+      const dealer = found(
+        await tx.dealer.findFirst({ where: { id: input.dealerId, projectId: ctx.projectId } }),
+      );
+      if (dealer.commissionPercent.gt(0)) {
+        dealerCommission = total.mul(dealer.commissionPercent).div(100).toDecimalPlaces(2);
+      }
+    }
     const booking = await tx.booking.create({
       data: {
         reference: await reference(tx, 'BKG'),
         unitId: unit.id,
         customerId: customer.id,
+        dealerId: input.dealerId,
         basePrice,
         charges: unit.charges,
         discount,
@@ -103,12 +113,24 @@ export async function createBooking(ctx: Context, input: z.infer<typeof bookingI
           installmentCount: input.installmentCount,
           intervalMonths: input.intervalMonths,
           firstInstallmentDate: input.firstInstallmentDate,
+          dealerId: input.dealerId,
         }),
         status: input.confirm ? 'CONFIRMED' : 'DRAFT',
         confirmedAt: input.confirm ? new Date() : null,
         approvedBy: input.confirm ? ctx.actor.id : null,
         createdBy: ctx.actor.id,
         owners: { create: owners },
+        ...(dealerCommission
+          ? {
+              commissions: {
+                create: {
+                  dealerId: input.dealerId!,
+                  amount: dealerCommission,
+                  status: 'PENDING',
+                },
+              },
+            }
+          : {}),
         installments: {
           create: calculated.schedule.map((row, i) => ({
             ...row,

@@ -19,6 +19,8 @@ const mimeTypes: Record<string, string> = {
   '.webp': 'image/webp',
   '.pdf': 'application/pdf',
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.doc': 'application/msword',
 };
 const forbidden = () =>
   new AppError(403, 'INVALID_DOWNLOAD', 'Download link is invalid or expired.');

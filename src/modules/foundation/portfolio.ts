@@ -25,7 +25,7 @@ export async function customerDirectoryPage(
       SELECT c.id, c."createdAt" FROM "Customer" c
       WHERE c."projectId" = ${ctx.projectId}::uuid
         ${identity ? Prisma.sql`AND c."identityHash" = ${identity}` : Prisma.empty}
-        ${search ? Prisma.sql`AND (c.name ILIKE ${search} OR c.phone ILIKE ${search})` : Prisma.empty}
+        ${search ? Prisma.sql`AND (c.name ILIKE ${search} OR c."fatherName" ILIKE ${search} OR c.phone ILIKE ${search})` : Prisma.empty}
     ), current_bookings AS (
       SELECT b.id, b.status, b."paymentType", b.total, o."customerId",
         COALESCE((SELECT SUM(p.amount) FROM "Payment" p

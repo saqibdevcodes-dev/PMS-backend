@@ -148,13 +148,24 @@ export function salesRoutes(app: Express) {
       const where: Prisma.BookingWhereInput = {
         unit: { projectId: ctx.projectId },
         status: q.status,
-        ...(q.search ? { reference: { contains: q.search, mode: 'insensitive' } } : {}),
+        ...(q.search
+          ? {
+              OR: [
+                { reference: { contains: q.search, mode: 'insensitive' } },
+                { customer: { name: { contains: q.search, mode: 'insensitive' } } },
+                { customer: { fatherName: { contains: q.search, mode: 'insensitive' } } },
+                { customer: { phone: { contains: q.search } } },
+                { customer: { reference: { contains: q.search, mode: 'insensitive' } } },
+                { unit: { number: { contains: q.search, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
       };
       const [items, total] = await Promise.all([
         db.booking.findMany({
           where,
           include: {
-            customer: { select: { id: true, name: true, phone: true } },
+            customer: { select: { id: true, reference: true, name: true, fatherName: true, phone: true } },
             unit: {
               select: {
                 id: true,

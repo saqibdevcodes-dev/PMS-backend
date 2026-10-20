@@ -31,7 +31,7 @@ export async function customerStatementReport(
   const customer = found(
     await tx.customer.findFirst({
       where: { id: q.customerId, projectId },
-      select: { name: true, reference: true, email: true, phone: true },
+      select: { id: true, name: true, reference: true, email: true, phone: true },
     }),
   );
   const unit = { projectId, phase: q.phase };

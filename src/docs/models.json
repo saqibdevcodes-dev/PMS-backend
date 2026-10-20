@@ -135,6 +135,20 @@
           "kind": "object",
           "isList": true,
           "isRequired": true
+        },
+        {
+          "name": "documents",
+          "type": "Document",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "ledgerEntries",
+          "type": "EmployeeLedgerEntry",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
         }
       ]
     },
@@ -766,6 +780,13 @@
           "kind": "object",
           "isList": true,
           "isRequired": true
+        },
+        {
+          "name": "employeeLedgers",
+          "type": "EmployeeLedgerEntry",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
         }
       ]
     },
@@ -1152,11 +1173,25 @@
           "isRequired": true
         },
         {
+          "name": "fatherName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
           "name": "phone",
           "type": "String",
           "kind": "scalar",
           "isList": false,
           "isRequired": true
+        },
+        {
+          "name": "secondaryPhone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
         },
         {
           "name": "email",
@@ -4107,6 +4142,13 @@
           "isRequired": false
         },
         {
+          "name": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
           "name": "key",
           "type": "String",
           "kind": "scalar",
@@ -4172,6 +4214,130 @@
         {
           "name": "booking",
           "type": "Booking",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "user",
+          "type": "User",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        }
+      ]
+    },
+    {
+      "name": "EmployeeLedgerEntry",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "date",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "type",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "debit",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "credit",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paymentMethod",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "user",
+          "type": "User",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
           "kind": "object",
           "isList": false,
           "isRequired": false

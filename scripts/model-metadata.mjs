@@ -1,7 +1,8 @@
 // Prisma's runtime DMMF omits cardinality metadata. Read it from the schema instead.
 import { readFile, writeFile } from 'node:fs/promises';
 import { URL } from 'node:url';
-const schema = await readFile(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
+const rawSchema = await readFile(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
+const schema = rawSchema.replace(/\r\n/g, '\n');
 const blocks = [...schema.matchAll(/^(model|enum)\s+(\w+)\s*\{([\s\S]*?)^\}/gm)];
 const modelNames = new Set(blocks.filter((b) => b[1] === 'model').map((b) => b[2]));
 const enumNames = new Set(blocks.filter((b) => b[1] === 'enum').map((b) => b[2]));

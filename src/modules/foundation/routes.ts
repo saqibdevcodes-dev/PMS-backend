@@ -80,10 +80,24 @@ const unitBody = unitFields.superRefine((v, ctx) => {
 export const customerBody = z
   .object({
     name: z.string().min(2).max(200),
+    fatherName: z.preprocess(
+      (v) => (v === '' ? null : v),
+      z.string().max(200).nullable().optional(),
+    ),
     phone: z.string().min(6).max(30),
-    email: z.email().optional(),
-    address: z.string().max(1000).optional(),
-    photoId: uuid.optional(),
+    secondaryPhone: z.preprocess(
+      (v) => (v === '' ? null : v),
+      z.string().max(30).nullable().optional(),
+    ),
+    email: z.preprocess(
+      (v) => (v === '' ? null : v),
+      z.string().email().nullable().optional(),
+    ),
+    address: z.preprocess(
+      (v) => (v === '' ? null : v),
+      z.string().max(1000).nullable().optional(),
+    ),
+    photoId: z.preprocess((v) => (v === '' ? null : v), uuid.nullable().optional()),
     identity: z
       .string()
       .min(5)
@@ -114,7 +128,9 @@ const publicCustomer = {
   projectId: true,
   reference: true,
   name: true,
+  fatherName: true,
   phone: true,
+  secondaryPhone: true,
   email: true,
   address: true,
   photoId: true,
@@ -351,6 +367,33 @@ export function foundationRoutes(app: Express) {
   );
   endpoint(
     app,
+    'get',
+    '/users/:id',
+    { permission: 'users.manage', summary: 'Get user details by id' },
+    async (_ctx, _b, _q, req) => {
+      const user = found(
+        await db.user.findFirst({
+          where: { id: id(req), accountType: 'STAFF' },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            active: true,
+            photoId: true,
+            createdAt: true,
+            updatedAt: true,
+            firstLoginAt: true,
+            credentialsIssuedAt: true,
+            roles: { include: { role: { include: { permissions: true } } } },
+            projects: { include: { project: { select: { id: true, name: true, code: true } } } },
+          },
+        }),
+      );
+      return user;
+    },
+  );
+  endpoint(
+    app,
     'patch',
     '/users/:id',
     {
@@ -477,6 +520,186 @@ export function foundationRoutes(app: Express) {
           `An administrator updated your roles or project access. Sign in to review your current access: ${webLink()}`,
         );
         return { updated: true };
+      }),
+  );
+  endpoint(
+    app,
+    'get',
+    '/users/:id/ledger',
+    {
+      permission: 'users.manage',
+      summary: 'Get employee account statement and ledger transactions',
+      query: z
+        .object({
+          from: z.string().optional(),
+          to: z.string().optional(),
+          projectId: uuid.optional(),
+        })
+        .strict(),
+    },
+    async (_ctx, _b, q, req) => {
+      const user = found(
+        await db.user.findFirst({
+          where: { id: id(req), accountType: 'STAFF' },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            active: true,
+            createdAt: true,
+            roles: { include: { role: true } },
+            projects: { include: { project: { select: { id: true, name: true, code: true } } } },
+          },
+        }),
+      );
+
+      const where: Prisma.EmployeeLedgerEntryWhereInput = {
+        userId: user.id,
+        ...(q.projectId ? { projectId: q.projectId } : {}),
+        ...(q.from || q.to
+          ? {
+              date: {
+                ...(q.from ? { gte: new Date(q.from) } : {}),
+                ...(q.to ? { lte: new Date(q.to + 'T23:59:59.999Z') } : {}),
+              },
+            }
+          : {}),
+      };
+
+      const rawEntries = await db.employeeLedgerEntry.findMany({
+        where,
+        include: { project: { select: { id: true, name: true, code: true } } },
+        orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
+      });
+
+      let running = 0;
+      let totalDebit = 0;
+      let totalCredit = 0;
+
+      const entries = rawEntries.map((e) => {
+        const d = Number(e.debit);
+        const c = Number(e.credit);
+        totalDebit += d;
+        totalCredit += c;
+        running += c - d;
+        return {
+          id: e.id,
+          date: e.date.toISOString(),
+          reference: e.reference,
+          type: e.type,
+          description: e.description,
+          debit: d.toFixed(2),
+          credit: c.toFixed(2),
+          runningBalance: running.toFixed(2),
+          paymentMethod: e.paymentMethod,
+          status: e.status,
+          projectId: e.projectId,
+          projectName: e.project?.name ?? null,
+          createdAt: e.createdAt.toISOString(),
+        };
+      });
+
+      return {
+        employee: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          active: user.active,
+          roles: user.roles.map((r) => r.role.name),
+          createdAt: user.createdAt.toISOString(),
+        },
+        metrics: {
+          totalDebit: totalDebit.toFixed(2),
+          totalCredit: totalCredit.toFixed(2),
+          balance: running.toFixed(2),
+          entryCount: entries.length,
+        },
+        entries,
+      };
+    },
+  );
+  endpoint(
+    app,
+    'post',
+    '/users/:id/ledger',
+    {
+      permission: 'users.manage',
+      summary: 'Create a new employee ledger voucher / transaction',
+      body: z
+        .object({
+          projectId: uuid.optional(),
+          date: z.string().optional(),
+          type: z
+            .enum([
+              'SALARY',
+              'COMMISSION',
+              'ADVANCE',
+              'EXPENSE_REIMBURSEMENT',
+              'BONUS',
+              'ALLOWANCE',
+              'DEDUCTION',
+              'PAYMENT',
+              'ADJUSTMENT',
+            ])
+            .default('ADJUSTMENT'),
+          reference: z.string().max(80).optional(),
+          description: z.string().min(2).max(500),
+          debit: z.number().min(0).default(0),
+          credit: z.number().min(0).default(0),
+          paymentMethod: z
+            .enum(['CASH', 'BANK_TRANSFER', 'CHEQUE', 'ADJUSTMENT', 'ONLINE'])
+            .optional(),
+          status: z.enum(['POSTED', 'PENDING', 'CANCELLED']).default('POSTED'),
+        })
+        .strict(),
+    },
+    async (ctx, b, _q, req) =>
+      transaction(async (tx) => {
+        const user = found(
+          await tx.user.findFirst({ where: { id: id(req), accountType: 'STAFF' } }),
+        );
+        const ref =
+          b.reference?.trim() ||
+          `VCH-${Math.floor(100000 + Math.random() * 900000)}`;
+        const entry = await tx.employeeLedgerEntry.create({
+          data: {
+            userId: user.id,
+            projectId: b.projectId,
+            date: b.date ? new Date(b.date) : new Date(),
+            reference: ref,
+            type: b.type,
+            description: b.description,
+            debit: b.debit,
+            credit: b.credit,
+            paymentMethod: b.paymentMethod,
+            status: b.status,
+            createdBy: ctx.actor.id,
+          },
+        });
+        await audit(tx, ctx, 'employee.ledger_created', entry.id, {
+          userId: user.id,
+          amount: b.debit || b.credit,
+          type: b.type,
+        });
+        return entry;
+      }),
+  );
+  endpoint(
+    app,
+    'delete',
+    '/users/:id/ledger/:entryId',
+    { permission: 'users.manage', summary: 'Delete an employee ledger entry' },
+    async (ctx, _b, _q, req) =>
+      transaction(async (tx) => {
+        const entryId = uuid.parse(req.params.entryId);
+        const entry = found(
+          await tx.employeeLedgerEntry.findFirst({
+            where: { id: entryId, userId: id(req) },
+          }),
+        );
+        await tx.employeeLedgerEntry.delete({ where: { id: entry.id } });
+        await audit(tx, ctx, 'employee.ledger_deleted', entry.id);
+        return { deleted: true };
       }),
   );
   endpoint(
@@ -862,6 +1085,81 @@ export function foundationRoutes(app: Express) {
   endpoint(
     app,
     'get',
+    root + '/customers/check-email',
+    {
+      summary: 'Check if an email is already registered to an existing member or user account',
+      query: z.object({
+        email: z.string().trim(),
+      }),
+    },
+    async (ctx, _b, q) => {
+      if (
+        !ctx.actor.permissions.has('customers.read') &&
+        !ctx.actor.permissions.has('customers.create')
+      ) {
+        throw new AppError(403, 'FORBIDDEN', 'Customer read or create permission is required.');
+      }
+      const rawEmail = q.email?.trim().toLowerCase();
+      if (!rawEmail || !rawEmail.includes('@') || rawEmail.length < 5) {
+        return { available: false, exists: false, reason: 'Invalid email address.' };
+      }
+
+      // Check Customer table (case-insensitive)
+      const existingCustomer = await db.customer.findFirst({
+        where: {
+          email: { equals: rawEmail, mode: 'insensitive' },
+        },
+        select: {
+          id: true,
+          name: true,
+          reference: true,
+          projectId: true,
+        },
+      });
+
+      if (existingCustomer) {
+        return {
+          available: false,
+          exists: true,
+          reason: 'This email is already registered to a member.',
+          existingMember: {
+            name: existingCustomer.name,
+            reference: existingCustomer.reference,
+            sameProject: existingCustomer.projectId === ctx.projectId,
+          },
+        };
+      }
+
+      // Check User table
+      const existingUser = await db.user.findUnique({
+        where: { email: rawEmail },
+        select: { id: true, name: true, accountType: true },
+      });
+
+      if (existingUser) {
+        return {
+          available: false,
+          exists: true,
+          reason: 'This email is already associated with an existing user account.',
+          existingMember: {
+            name: existingUser.name,
+            reference: undefined,
+            sameProject: true,
+          },
+        };
+      }
+
+      return {
+        available: true,
+        exists: false,
+        reason: 'Email is available for registration.',
+        existingMember: null,
+      };
+    },
+  );
+  endpoint(
+    app,
+    'get',
     root + '/customers',
     {
       permission: 'customers.read',
@@ -910,6 +1208,7 @@ export function foundationRoutes(app: Express) {
           ? {
               OR: [
                 { name: { contains: q.search, mode: 'insensitive' } },
+                { fatherName: { contains: q.search, mode: 'insensitive' } },
                 { phone: { contains: q.search } },
               ],
             }
@@ -977,7 +1276,6 @@ export function foundationRoutes(app: Express) {
       summary: 'Update non-identity customer contact details',
       body: customerBody
         .omit({ identity: true })
-        .extend({ photoId: uuid.nullable().optional() })
         .partial(),
     },
     async (ctx, b, _q, req) =>

@@ -128,6 +128,14 @@ export function reportRoutes(app: Express) {
           'Document access is required.',
           403,
         );
+      if (job.status !== 'COMPLETED' || !job.resultKey) {
+        const { generateArtifact } = await import('../../jobs/artifacts.js');
+        await generateArtifact(job.id);
+        const updated = await db.backgroundJob.findUnique({ where: { id: job.id } });
+        if (updated?.status === 'COMPLETED' && updated.resultKey) {
+          return { url: await signedDownload(updated.resultKey), expiresIn: 120 };
+        }
+      }
       requireState(
         job.status === 'COMPLETED' && job.resultKey,
         'JOB_NOT_COMPLETE',
