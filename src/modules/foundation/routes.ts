@@ -89,14 +89,8 @@ export const customerBody = z
       (v) => (v === '' ? null : v),
       z.string().max(30).nullable().optional(),
     ),
-    email: z.preprocess(
-      (v) => (v === '' ? null : v),
-      z.string().email().nullable().optional(),
-    ),
-    address: z.preprocess(
-      (v) => (v === '' ? null : v),
-      z.string().max(1000).nullable().optional(),
-    ),
+    email: z.preprocess((v) => (v === '' ? null : v), z.string().email().nullable().optional()),
+    address: z.preprocess((v) => (v === '' ? null : v), z.string().max(1000).nullable().optional()),
     photoId: z.preprocess((v) => (v === '' ? null : v), uuid.nullable().optional()),
     identity: z
       .string()
@@ -658,9 +652,7 @@ export function foundationRoutes(app: Express) {
         const user = found(
           await tx.user.findFirst({ where: { id: id(req), accountType: 'STAFF' } }),
         );
-        const ref =
-          b.reference?.trim() ||
-          `VCH-${Math.floor(100000 + Math.random() * 900000)}`;
+        const ref = b.reference?.trim() || `VCH-${Math.floor(100000 + Math.random() * 900000)}`;
         const entry = await tx.employeeLedgerEntry.create({
           data: {
             userId: user.id,
@@ -1274,9 +1266,7 @@ export function foundationRoutes(app: Express) {
     {
       permission: 'customers.update',
       summary: 'Update non-identity customer contact details',
-      body: customerBody
-        .omit({ identity: true })
-        .partial(),
+      body: customerBody.omit({ identity: true }).partial(),
     },
     async (ctx, b, _q, req) =>
       transaction(async (tx) => {

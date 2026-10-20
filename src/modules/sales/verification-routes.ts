@@ -179,7 +179,9 @@ export function verificationRoutes(app: Express) {
           ? await db.customer.findFirst({
               where: { id: clean },
               include: {
-                project: { select: { id: true, name: true, code: true, currency: true, timezone: true } },
+                project: {
+                  select: { id: true, name: true, code: true, currency: true, timezone: true },
+                },
                 owners: {
                   where: { validTo: null },
                   include: {
@@ -195,7 +197,9 @@ export function verificationRoutes(app: Express) {
           take: 500,
           orderBy: { createdAt: 'desc' },
           include: {
-            project: { select: { id: true, name: true, code: true, currency: true, timezone: true } },
+            project: {
+              select: { id: true, name: true, code: true, currency: true, timezone: true },
+            },
             owners: {
               where: { validTo: null },
               include: {

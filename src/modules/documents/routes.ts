@@ -109,7 +109,9 @@ export function documentRoutes(app: Express) {
       ];
       const valid =
         allowedExts.includes(extension) &&
-        (detected ? allowedMimes.includes(detected.mime) : extension === '.docx' || extension === '.doc');
+        (detected
+          ? allowedMimes.includes(detected.mime)
+          : extension === '.docx' || extension === '.doc');
       requireState(
         valid,
         'INVALID_FILE_TYPE',
@@ -247,7 +249,9 @@ export function documentRoutes(app: Express) {
     async (ctx, _b, _q, req) =>
       transaction(async (tx) => {
         const docId = uuid.parse(req.params.documentId);
-        const document = found(await tx.document.findFirst({ where: { id: docId, userId: id(req) } }));
+        const document = found(
+          await tx.document.findFirst({ where: { id: docId, userId: id(req) } }),
+        );
         await tx.document.delete({ where: { id: document.id } });
         await audit(tx, ctx, 'document.deleted', document.id);
         return { deleted: true };

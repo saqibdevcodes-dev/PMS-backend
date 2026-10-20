@@ -577,9 +577,7 @@ export async function queueExport(
   });
 
   // Ensure artifact is generated immediately so single-process dev and web servers fulfill downloads seamlessly
-  import('../../jobs/artifacts.js')
-    .then((m) => m.generateArtifact(job.id))
-    .catch(() => {});
+  import('../../jobs/artifacts.js').then((m) => m.generateArtifact(job.id)).catch(() => {});
 
   return job;
 }

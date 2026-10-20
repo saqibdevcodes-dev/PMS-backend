@@ -165,7 +165,9 @@ export function salesRoutes(app: Express) {
         db.booking.findMany({
           where,
           include: {
-            customer: { select: { id: true, reference: true, name: true, fatherName: true, phone: true } },
+            customer: {
+              select: { id: true, reference: true, name: true, fatherName: true, phone: true },
+            },
             unit: {
               select: {
                 id: true,

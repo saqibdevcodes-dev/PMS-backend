@@ -17,7 +17,9 @@ export async function scopedBooking(tx: Tx, ctx: Context, id: string) {
       where: { id, unit: { projectId: ctx.projectId } },
       include: {
         unit: true,
-        customer: { select: { id: true, reference: true, name: true, fatherName: true, phone: true } },
+        customer: {
+          select: { id: true, reference: true, name: true, fatherName: true, phone: true },
+        },
         owners: { where: { validTo: null } },
       },
     }),
