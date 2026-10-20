@@ -1079,18 +1079,13 @@ export function foundationRoutes(app: Express) {
     'get',
     root + '/customers/check-email',
     {
+      permission: 'customers.read',
       summary: 'Check if an email is already registered to an existing member or user account',
       query: z.object({
         email: z.string().trim(),
       }),
     },
     async (ctx, _b, q) => {
-      if (
-        !ctx.actor.permissions.has('customers.read') &&
-        !ctx.actor.permissions.has('customers.create')
-      ) {
-        throw new AppError(403, 'FORBIDDEN', 'Customer read or create permission is required.');
-      }
       const rawEmail = q.email?.trim().toLowerCase();
       if (!rawEmail || !rawEmail.includes('@') || rawEmail.length < 5) {
         return { available: false, exists: false, reason: 'Invalid email address.' };
