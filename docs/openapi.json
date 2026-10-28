@@ -23883,7 +23883,6 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "default": "5e4ed281-b9f8-47e3-9aa4-be6140177069",
                           "type": "string"
                         },
                         "name": {
@@ -24315,7 +24314,6 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "default": "b924b8e8-1956-4443-9b3f-7af117ae74ed",
                           "type": "string"
                         },
                         "name": {
