@@ -1,6 +1,16 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { constants } from 'node:fs';
-import { access, lstat, mkdir, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import {
+  access,
+  lstat,
+  mkdir,
+  realpath,
+  readFile,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { Express } from 'express';
 import { z } from 'zod';
@@ -100,6 +110,17 @@ export class LocalStorage {
     const url = new URL('/api/v1/files', this.options.publicUrl);
     url.searchParams.set('token', token);
     return url.toString();
+  }
+  async read(key: string, maxBytes: number) {
+    const root = await realpath(this.directory);
+    const path = await realpath(join(root, ...segments(key)));
+    if (!contained(root, path)) throw forbidden();
+    const info = await stat(path);
+    if (!info.isFile()) throw missing();
+    if (info.size > maxBytes) throw new Error('Stored image exceeds the size limit');
+    const body = await readFile(path);
+    if (body.length > maxBytes) throw new Error('Stored image exceeds the size limit');
+    return body;
   }
 
   private signature(payload: string) {

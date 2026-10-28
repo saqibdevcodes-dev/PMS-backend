@@ -59,6 +59,8 @@ describe('generated API contract', () => {
       const operationPermission = [
         '/projects/:projectId/approvals/:id/decide',
         '/projects/:projectId/approvals/:id/resubmit',
+        // Non-sensitive branding is available to all assigned staff for their documents.
+        '/projects/:projectId/branding',
       ].includes(route.path);
       expect(Boolean(route.permission) || operationPermission, route.path).toBe(true);
     }

@@ -33,6 +33,12 @@ export async function uploadImage(
     'Choose a valid JPEG, PNG or WebP image up to 5 MiB.',
     422,
   );
+  requireState(
+    purpose !== 'PROJECT_LOGO' || ['image/png', 'image/jpeg'].includes(detected.mime),
+    'INVALID_LOGO',
+    'Choose a PNG or JPEG project logo up to 5 MiB for printing and PDF exports.',
+    422,
+  );
   if (env.MALWARE_SCAN_URL) {
     const scan = await fetch(env.MALWARE_SCAN_URL, {
       method: 'POST',

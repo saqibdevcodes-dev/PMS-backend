@@ -7,14 +7,28 @@ import { putObject } from '../integrations/storage.js';
 import { found, requireState } from '../common/errors.js';
 import { emailUser, webLink } from '../common/notifications.js';
 import { statementPdf } from './statement-pdf.js';
-export function pdfBuffer(title: string, rows: ReportRow[] | string): Promise<Buffer> {
+import { projectBranding, drawDocumentBrand, type DocumentBranding } from './project-branding.js';
+export function pdfBuffer(
+  title: string,
+  rows: ReportRow[] | string,
+  branding?: DocumentBranding,
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 42, info: { Title: title } });
     const chunks: Buffer[] = [];
     doc.on('data', (b: Buffer) => chunks.push(b));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
-    doc.fontSize(18).text(title);
+    if (branding) {
+      drawDocumentBrand(doc, branding, 42, 42);
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .text(branding.name, 220, 42, { width: 290, align: 'right' });
+      doc.y = 110;
+      doc.x = 42;
+    }
+    doc.font('Helvetica-Bold').fontSize(18).fillColor('#203249').text(title);
     doc.moveDown();
     doc.fontSize(10);
     if (typeof rows === 'string') doc.text(rows);
@@ -82,6 +96,7 @@ export async function generateArtifact(jobId: string) {
     let body: Buffer;
     let extension: string;
     let mime: string;
+    const branding = await projectBranding(job.projectId);
     if (job.kind === 'REPORT') {
       const input = z
         .object({ report: reportQuery, format: z.enum(['xlsx', 'pdf']) })
@@ -102,8 +117,8 @@ export async function generateArtifact(jobId: string) {
       } else {
         body =
           'statement' in result && result.statement
-            ? await statementPdf(result.statement)
-            : await pdfBuffer(input.report.kind + ' report', result.rows);
+            ? await statementPdf(result.statement, branding)
+            : await pdfBuffer(input.report.kind + ' report', result.rows, branding);
         mime = 'application/pdf';
       }
     } else {
@@ -136,7 +151,7 @@ export async function generateArtifact(jobId: string) {
         );
         return variables[key]!;
       });
-      body = await pdfBuffer(template.name, content);
+      body = await pdfBuffer(template.name, content, branding);
       extension = 'pdf';
       mime = 'application/pdf';
     }

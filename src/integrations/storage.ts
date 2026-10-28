@@ -7,6 +7,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Express } from 'express';
+import { Readable } from 'node:stream';
 import { env } from '../config/env.js';
 import { LocalStorage } from './local-storage.js';
 const settings = {
@@ -55,6 +56,29 @@ export async function putObject(key: string, body: Buffer, mime: string) {
   await s3!.send(
     new PutObjectCommand({ Bucket: env.S3_BUCKET, Key: key, Body: body, ContentType: mime }),
   );
+}
+// Server-side document generation reads trusted storage keys, never arbitrary image URLs.
+export async function readObject(key: string, maxBytes = 5 * 1024 * 1024): Promise<Buffer> {
+  if (local) return local.read(key, maxBytes);
+  const result = await s3!.send(new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key }), {
+    abortSignal: AbortSignal.timeout(15000),
+  });
+  if (!(result.Body instanceof Readable) || (result.ContentLength ?? 0) > maxBytes) {
+    if (result.Body instanceof Readable) result.Body.destroy();
+    throw new Error('Stored image is missing or exceeds the size limit');
+  }
+  const chunks: Buffer[] = [];
+  let length = 0;
+  for await (const chunk of result.Body) {
+    const bytes = Buffer.from(chunk);
+    length += bytes.length;
+    if (length > maxBytes) {
+      result.Body.destroy();
+      throw new Error('Stored image exceeds the size limit');
+    }
+    chunks.push(bytes);
+  }
+  return Buffer.concat(chunks);
 }
 export async function signedDownload(key: string, name?: string, inline = false) {
   if (local) return local.signedDownload(key, name, inline);

@@ -20,11 +20,13 @@ const cookieOptions = {
   sameSite: 'strict' as const,
   path: '/api/v1/auth/refresh',
 };
+
 function browserOrigin(req: Request) {
   const origin = req.headers.origin;
   if (!origin || !env.TRUSTED_ORIGINS.includes(origin))
     throw new AppError(403, 'CSRF_ORIGIN_REJECTED', 'A trusted Origin header is required.');
 }
+
 function webResult(result: Awaited<ReturnType<typeof auth.login>>, res: Response) {
   res.cookie(cookieName, result.refreshToken, {
     ...cookieOptions,
@@ -36,6 +38,7 @@ function webResult(result: Awaited<ReturnType<typeof auth.login>>, res: Response
     sessionId: result.sessionId,
   };
 }
+
 export function authRoutes(app: Express) {
   endpoint(
     app,
@@ -58,6 +61,7 @@ export function authRoutes(app: Express) {
       );
     },
   );
+
   endpoint(
     app,
     'post',
@@ -73,6 +77,7 @@ export function authRoutes(app: Express) {
       return webResult(await auth.refresh(token.data, false), res);
     },
   );
+
   endpoint(
     app,
     'post',
@@ -89,6 +94,7 @@ export function authRoutes(app: Express) {
         userAgent: req.get('user-agent'),
       }),
   );
+
   endpoint(
     app,
     'post',
@@ -112,6 +118,7 @@ export function authRoutes(app: Express) {
         return auth.logout(ctx, all);
       },
     );
+
   endpoint(
     app,
     'get',
@@ -133,6 +140,7 @@ export function authRoutes(app: Express) {
       return { ...user, permissions: [...ctx.actor.permissions] };
     },
   );
+
   endpoint(
     app,
     'post',
@@ -144,6 +152,7 @@ export function authRoutes(app: Express) {
     },
     async (ctx, body) => auth.changePassword(ctx, body.currentPassword, body.newPassword),
   );
+
   endpoint(
     app,
     'post',
@@ -156,6 +165,7 @@ export function authRoutes(app: Express) {
     },
     async (_ctx, body) => auth.forgotPassword(body.email),
   );
+
   endpoint(
     app,
     'post',
@@ -168,6 +178,7 @@ export function authRoutes(app: Express) {
     },
     async (_ctx, body) => auth.resetPassword(body.token, body.password),
   );
+
   endpoint(
     app,
     'get',
@@ -187,6 +198,7 @@ export function authRoutes(app: Express) {
         },
       }),
   );
+
   endpoint(
     app,
     'delete',
@@ -200,6 +212,7 @@ export function authRoutes(app: Express) {
       return { revoked: true };
     },
   );
+
   endpoint(
     app,
     'post',
@@ -225,6 +238,7 @@ export function authRoutes(app: Express) {
         select: { id: true, installationId: true, platform: true },
       }),
   );
+  
   endpoint(
     app,
     'delete',

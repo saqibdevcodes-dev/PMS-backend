@@ -6,6 +6,7 @@ import { audit } from '../../common/operations.js';
 import { throttle } from '../../integrations/redis.js';
 import { putObject, signedDownload } from '../../integrations/storage.js';
 import { statementPdf } from '../../jobs/statement-pdf.js';
+import { projectBranding } from '../../jobs/project-branding.js';
 import {
   type AccountStatement,
   paymentColumns,
@@ -126,7 +127,7 @@ export async function customerStatement(ctx: Context, bookingId: string) {
       },
     ],
   };
-  const pdf = await statementPdf(statement);
+  const pdf = await statementPdf(statement, await projectBranding(booking.unit.project.id));
   await ownBooking(ctx.actor.id, bookingId);
   const key = `portal-statements/${ctx.actor.id}/${randomUUID()}.pdf`;
   await putObject(key, pdf, 'application/pdf');

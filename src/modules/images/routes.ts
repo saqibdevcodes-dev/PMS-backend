@@ -48,7 +48,7 @@ export function imageRoutes(app: Express) {
         'Image upload permission is required.',
         403,
       );
-      const scoped = !['PROJECT', 'USER'].includes(body.purpose);
+      const scoped = !['PROJECT', 'PROJECT_LOGO', 'USER'].includes(body.purpose);
       requireState(
         !scoped || body.projectId,
         'PROJECT_REQUIRED',
@@ -81,6 +81,26 @@ export function imageRoutes(app: Express) {
     },
     async (ctx, _b, _q, req) => {
       const image = found(await db.imageAsset.findUnique({ where: { id: id(req) } }));
+      if (image.purpose === 'PROJECT_LOGO') {
+        const attached = await db.project.findFirst({
+          where: {
+            logoId: image.id,
+            ...(ctx.actor.accountType === 'CUSTOMER'
+              ? { customers: { some: { portalUserId: ctx.actor.id } } }
+              : { access: { some: { userId: ctx.actor.id } } }),
+          },
+        });
+        const ownUpload =
+          ctx.actor.accountType !== 'CUSTOMER' &&
+          image.uploadedBy === ctx.actor.id &&
+          imageGrants.PROJECT_LOGO.write.some((p) => ctx.actor.permissions.has(p));
+        found(attached || ownUpload ? image : null);
+        return {
+          url: await signedDownload(image.key, image.name, true),
+          expiresIn: 120,
+          name: image.name,
+        };
+      }
       if (ctx.actor.accountType === 'CUSTOMER') {
         const ownPhoto =
           image.purpose === 'USER'

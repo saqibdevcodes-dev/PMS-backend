@@ -537,6 +537,20 @@
       "name": "Project",
       "fields": [
         {
+          "name": "logoId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "logo",
+          "type": "ImageAsset",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
           "name": "location",
           "type": "String",
           "kind": "scalar",
@@ -782,6 +796,13 @@
           "isRequired": true
         },
         {
+          "name": "propertyPurchases",
+          "type": "PropertyPurchase",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
           "name": "employeeLedgers",
           "type": "EmployeeLedgerEntry",
           "kind": "object",
@@ -1011,6 +1032,13 @@
         {
           "name": "allocations",
           "type": "DealerAllocation",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "purchases",
+          "type": "PropertyPurchase",
           "kind": "object",
           "isList": true,
           "isRequired": true
@@ -2834,6 +2862,13 @@
           "kind": "object",
           "isList": true,
           "isRequired": true
+        },
+        {
+          "name": "purchases",
+          "type": "PropertyPurchase",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
         }
       ]
     },
@@ -3739,6 +3774,20 @@
       "name": "Journal",
       "fields": [
         {
+          "name": "purchase",
+          "type": "PropertyPurchase",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "reversedPurchase",
+          "type": "PropertyPurchase",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
           "name": "id",
           "type": "String",
           "kind": "scalar",
@@ -4053,6 +4102,34 @@
       "name": "Vendor",
       "fields": [
         {
+          "name": "category",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "address",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "purchases",
+          "type": "PropertyPurchase",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
           "name": "lines",
           "type": "JournalLine",
           "kind": "object",
@@ -4093,6 +4170,242 @@
           "kind": "object",
           "isList": false,
           "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "PropertyPurchase",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "vendorId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "location",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "purchaseDate",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "price",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "taxes",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "legalFees",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "brokerage",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "otherCosts",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "total",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "fileReference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "notes",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "reversalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "postedBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "postedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "voidReason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "unitId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "dealerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "expenseItems",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "vendor",
+          "type": "Vendor",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "unit",
+          "type": "Unit",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "dealer",
+          "type": "Dealer",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "journal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "reversal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
         }
       ]
     },
@@ -4786,6 +5099,13 @@
     {
       "name": "ImageAsset",
       "fields": [
+        {
+          "name": "projectLogos",
+          "type": "Project",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
         {
           "name": "id",
           "type": "String",

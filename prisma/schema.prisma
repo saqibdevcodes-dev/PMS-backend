@@ -74,26 +74,26 @@ enum AccountTypeScope {
 
 model User {
   credentialsIssuedAt DateTime?
-  firstLoginAt DateTime?
-  photoId       String? @db.Uuid
-  photo         ImageAsset? @relation("UserPhoto", fields: [photoId], references: [id], onDelete: Restrict)
-  id            String              @id @default(uuid()) @db.Uuid
-  email         String              @unique
-  name          String
-  passwordHash  String
-  accountType   AccountTypeScope    @default(STAFF)
-  portalCustomers Customer[]
-  active        Boolean             @default(true)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  roles         UserRole[]
-  projects      UserProjectAccess[]
-  sessions      Session[]
-  resets        PasswordReset[]
-  devices       Device[]
-  notifications Notification[]
-  documents     Document[]
-  ledgerEntries EmployeeLedgerEntry[]
+  firstLoginAt        DateTime?
+  photoId             String?               @db.Uuid
+  photo               ImageAsset?           @relation("UserPhoto", fields: [photoId], references: [id], onDelete: Restrict)
+  id                  String                @id @default(uuid()) @db.Uuid
+  email               String                @unique
+  name                String
+  passwordHash        String
+  accountType         AccountTypeScope      @default(STAFF)
+  portalCustomers     Customer[]
+  active              Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  roles               UserRole[]
+  projects            UserProjectAccess[]
+  sessions            Session[]
+  resets              PasswordReset[]
+  devices             Device[]
+  notifications       Notification[]
+  documents           Document[]
+  ledgerEntries       EmployeeLedgerEntry[]
 }
 
 model Role {
@@ -182,24 +182,26 @@ model Device {
 }
 
 model Project {
-  location String @default("")
-  description String @default("")
-  features String[] @default([])
-  featureImages Json @default("[]")
-  photoIds      String[] @default([]) @db.Uuid
-  photoId       String? @db.Uuid
-  photo         ImageAsset? @relation("ProjectPhoto", fields: [photoId], references: [id], onDelete: Restrict)
-  id                 String              @id @default(uuid()) @db.Uuid
-  code               String              @unique
+  logoId             String?               @db.Uuid
+  logo               ImageAsset?           @relation("ProjectLogo", fields: [logoId], references: [id], onDelete: Restrict)
+  location           String                @default("")
+  description        String                @default("")
+  features           String[]              @default([])
+  featureImages      Json                  @default("[]")
+  photoIds           String[]              @default([]) @db.Uuid
+  photoId            String?               @db.Uuid
+  photo              ImageAsset?           @relation("ProjectPhoto", fields: [photoId], references: [id], onDelete: Restrict)
+  id                 String                @id @default(uuid()) @db.Uuid
+  code               String                @unique
   name               String
-  currency           String              @default("PKR")
-  timezone           String              @default("Asia/Karachi")
-  reservationMinutes Int                 @default(60)
-  downPaymentPercent Decimal             @default(20) @db.Decimal(5, 2)
-  graceDays          Int                 @default(0)
-  ndcValidityDays    Int                 @default(30)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  currency           String                @default("PKR")
+  timezone           String                @default("Asia/Karachi")
+  reservationMinutes Int                   @default(60)
+  downPaymentPercent Decimal               @default(20) @db.Decimal(5, 2)
+  graceDays          Int                   @default(0)
+  ndcValidityDays    Int                   @default(30)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
   access             UserProjectAccess[]
   units              Unit[]
   customers          Customer[]
@@ -217,6 +219,7 @@ model Project {
   jobs               BackgroundJob[]
   banks              BankAccount[]
   vendors            Vendor[]
+  propertyPurchases  PropertyPurchase[]
   employeeLedgers    EmployeeLedgerEntry[]
 }
 
@@ -230,11 +233,11 @@ model ProjectSetting {
 }
 
 model Unit {
-  photoIds      String[] @default([]) @db.Uuid
-  photoId       String? @db.Uuid
-  photo         ImageAsset? @relation("UnitPhoto", fields: [photoId], references: [id], onDelete: Restrict)
-  typeDetails   String?
-  featureImages Json @default("[]")
+  photoIds        String[]           @default([]) @db.Uuid
+  photoId         String?            @db.Uuid
+  photo           ImageAsset?        @relation("UnitPhoto", fields: [photoId], references: [id], onDelete: Restrict)
+  typeDetails     String?
+  featureImages   Json               @default("[]")
   id              String             @id @default(uuid()) @db.Uuid
   projectId       String             @db.Uuid
   number          String
@@ -257,6 +260,7 @@ model Unit {
   reservations    Reservation[]
   bookings        Booking[]
   allocations     DealerAllocation[]
+  purchases       PropertyPurchase[]
 
   @@unique([projectId, number])
   @@index([projectId, status, type])
@@ -277,17 +281,17 @@ model UnitHistory {
 }
 
 model Customer {
-  identityType String @default("OTHER")
-  photoId              String?           @db.Uuid
-  photo                ImageAsset?       @relation("CustomerPhoto", fields: [photoId], references: [id], onDelete: Restrict)
-  portalUserId         String?           @db.Uuid
-  portalUser           User?             @relation(fields: [portalUserId], references: [id], onDelete: Restrict)
+  identityType         String               @default("OTHER")
+  photoId              String?              @db.Uuid
+  photo                ImageAsset?          @relation("CustomerPhoto", fields: [photoId], references: [id], onDelete: Restrict)
+  portalUserId         String?              @db.Uuid
+  portalUser           User?                @relation(fields: [portalUserId], references: [id], onDelete: Restrict)
   portalInvitations    CustomerInvitation[]
   payments             Payment[]
   notifications        Notification[]
-  id                   String            @id @default(uuid()) @db.Uuid
-  projectId            String            @db.Uuid
-  reference            String            @unique
+  id                   String               @id @default(uuid()) @db.Uuid
+  projectId            String               @db.Uuid
+  reference            String               @unique
   name                 String
   fatherName           String?
   phone                String
@@ -297,10 +301,10 @@ model Customer {
   identityEncrypted    String
   identityHash         String
   identityLast4        String
-  communicationConsent Boolean           @default(false)
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  project              Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  communicationConsent Boolean              @default(false)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  project              Project              @relation(fields: [projectId], references: [id], onDelete: Restrict)
   contacts             CustomerContact[]
   nominees             CustomerNominee[]
   owners               BookingOwner[]
@@ -419,32 +423,32 @@ model PaymentPlanVersion {
 }
 
 model Booking {
-  paymentType String @default("INSTALLMENTS")
-  paymentTerms Json @default("{}")
-  id              String             @id @default(uuid()) @db.Uuid
-  reference       String             @unique
-  unitId          String             @db.Uuid
-  customerId      String             @db.Uuid
-  reservationId   String?            @unique @db.Uuid
-  planVersionId   String?            @db.Uuid
-  dealerId        String?            @db.Uuid
-  status          BookingStatus      @default(DRAFT)
-  basePrice       Decimal            @db.Decimal(18, 2)
-  charges         Decimal            @db.Decimal(18, 2)
-  discount        Decimal            @db.Decimal(18, 2)
-  total           Decimal            @db.Decimal(18, 2)
-  downPayment     Decimal            @db.Decimal(18, 2)
-  scheduleVersion Int                @default(1)
-  createdBy       String             @db.Uuid
-  approvedBy      String?            @db.Uuid
+  paymentType     String              @default("INSTALLMENTS")
+  paymentTerms    Json                @default("{}")
+  id              String              @id @default(uuid()) @db.Uuid
+  reference       String              @unique
+  unitId          String              @db.Uuid
+  customerId      String              @db.Uuid
+  reservationId   String?             @unique @db.Uuid
+  planVersionId   String?             @db.Uuid
+  dealerId        String?             @db.Uuid
+  status          BookingStatus       @default(DRAFT)
+  basePrice       Decimal             @db.Decimal(18, 2)
+  charges         Decimal             @db.Decimal(18, 2)
+  discount        Decimal             @db.Decimal(18, 2)
+  total           Decimal             @db.Decimal(18, 2)
+  downPayment     Decimal             @db.Decimal(18, 2)
+  scheduleVersion Int                 @default(1)
+  createdBy       String              @db.Uuid
+  approvedBy      String?             @db.Uuid
   confirmedAt     DateTime?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  unit            Unit               @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  customer        Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  reservation     Reservation?       @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  unit            Unit                @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  customer        Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  reservation     Reservation?        @relation(fields: [reservationId], references: [id], onDelete: Restrict)
   planVersion     PaymentPlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
-  dealer          Dealer?            @relation(fields: [dealerId], references: [id], onDelete: Restrict)
+  dealer          Dealer?             @relation(fields: [dealerId], references: [id], onDelete: Restrict)
   owners          BookingOwner[]
   installments    Installment[]
   payments        Payment[]
@@ -502,9 +506,9 @@ model ScheduleRevision {
 }
 
 model Payment {
-  proofImageId  String? @db.Uuid
-  proofImage    ImageAsset? @relation("PaymentProof", fields: [proofImageId], references: [id], onDelete: Restrict)
-  methodDetails String?
+  proofImageId         String?               @db.Uuid
+  proofImage           ImageAsset?           @relation("PaymentProof", fields: [proofImageId], references: [id], onDelete: Restrict)
+  methodDetails        String?
   payerId              String                @db.Uuid
   payer                Customer              @relation(fields: [payerId], references: [id], onDelete: Restrict)
   id                   String                @id @default(uuid()) @db.Uuid
@@ -582,8 +586,8 @@ model RecoveryActivity {
 }
 
 model Dealer {
-  photoId       String? @db.Uuid
-  photo         ImageAsset? @relation("DealerPhoto", fields: [photoId], references: [id], onDelete: Restrict)
+  photoId           String?            @db.Uuid
+  photo             ImageAsset?        @relation("DealerPhoto", fields: [photoId], references: [id], onDelete: Restrict)
   id                String             @id @default(uuid()) @db.Uuid
   projectId         String             @db.Uuid
   name              String
@@ -596,6 +600,7 @@ model Dealer {
   leads             Lead[]
   commissions       DealerCommission[]
   allocations       DealerAllocation[]
+  purchases         PropertyPurchase[]
 }
 
 model DealerAllocation {
@@ -719,18 +724,18 @@ model Refund {
 }
 
 model Possession {
-  id              String         @id @default(uuid()) @db.Uuid
-  bookingId       String         @db.Uuid
-  status          WorkflowStatus @default(PENDING)
-  requestedBy     String         @db.Uuid
-  inspectionAt    DateTime?
-  inspectionNotes String?
-  handoverAt      DateTime?
-  verification    Json?
+  id                String         @id @default(uuid()) @db.Uuid
+  bookingId         String         @db.Uuid
+  status            WorkflowStatus @default(PENDING)
+  requestedBy       String         @db.Uuid
+  inspectionAt      DateTime?
+  inspectionNotes   String?
+  handoverAt        DateTime?
+  verification      Json?
   handoverReference String?
-  receivedByName  String?
-  snags           Snag[]
-  booking         Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  receivedByName    String?
+  snags             Snag[]
+  booking           Booking        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
 }
 
 model Snag {
@@ -769,23 +774,25 @@ model AccountingPeriod {
 }
 
 model Journal {
-  createdTransaction BigInt           @default(dbgenerated("txid_current()")) @ignore
-  id                 String           @id @default(uuid()) @db.Uuid
-  projectId          String           @db.Uuid
-  periodId           String           @db.Uuid
-  reference          String           @unique
+  purchase           PropertyPurchase? @relation("PurchaseJournal")
+  reversedPurchase   PropertyPurchase? @relation("PurchaseReversal")
+  createdTransaction BigInt            @default(dbgenerated("txid_current()")) @ignore
+  id                 String            @id @default(uuid()) @db.Uuid
+  projectId          String            @db.Uuid
+  periodId           String            @db.Uuid
+  reference          String            @unique
   source             String
-  sourceId           String           @db.Uuid
+  sourceId           String            @db.Uuid
   description        String
   postedAt           DateTime
-  createdBy          String           @db.Uuid
-  reversalOfId       String?          @unique @db.Uuid
-  createdAt          DateTime         @default(now())
-  project            Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  period             AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  createdBy          String            @db.Uuid
+  reversalOfId       String?           @unique @db.Uuid
+  createdAt          DateTime          @default(now())
+  project            Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  period             AccountingPeriod  @relation(fields: [periodId], references: [id], onDelete: Restrict)
   lines              JournalLine[]
-  reversalOf         Journal?         @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversal           Journal?         @relation("JournalReversal")
+  reversalOf         Journal?          @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal           Journal?          @relation("JournalReversal")
 
   @@unique([source, sourceId])
   @@index([projectId, postedAt])
@@ -829,37 +836,82 @@ model BankReconciliation {
 }
 
 model Vendor {
+  category  String             @default("SUPPLIER")
+  email     String?
+  address   String             @default("")
+  purchases PropertyPurchase[]
   lines     JournalLine[]
-  id        String        @id @default(uuid()) @db.Uuid
-  projectId String        @db.Uuid
+  id        String             @id @default(uuid()) @db.Uuid
+  projectId String             @db.Uuid
   name      String
   phone     String
-  project   Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  project   Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+}
+
+model PropertyPurchase {
+  id            String    @id @default(uuid()) @db.Uuid
+  projectId     String    @db.Uuid
+  vendorId      String    @db.Uuid
+  reference     String    @unique
+  title         String
+  location      String
+  purchaseDate  DateTime  @db.Date
+  price         Decimal   @db.Decimal(18, 2)
+  taxes         Decimal   @default(0) @db.Decimal(18, 2)
+  legalFees     Decimal   @default(0) @db.Decimal(18, 2)
+  brokerage     Decimal   @default(0) @db.Decimal(18, 2)
+  otherCosts    Decimal   @default(0) @db.Decimal(18, 2)
+  total         Decimal   @db.Decimal(18, 2)
+  fileReference String
+  notes         String    @default("")
+  status        String    @default("DRAFT")
+  journalId     String?   @unique @db.Uuid
+  reversalId    String?   @unique @db.Uuid
+  createdBy     String    @db.Uuid
+  postedBy      String?   @db.Uuid
+  postedAt      DateTime?
+  voidReason    String?
+  unitId        String?   @db.Uuid
+  dealerId      String?   @db.Uuid
+  expenseItems  Json      @default("[]")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  vendor        Vendor    @relation(fields: [vendorId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  unit          Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  dealer        Dealer?   @relation(fields: [dealerId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  journal       Journal?  @relation("PurchaseJournal", fields: [journalId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  reversal      Journal?  @relation("PurchaseReversal", fields: [reversalId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([projectId, vendorId, fileReference])
+  @@index([projectId, purchaseDate])
+  @@index([unitId])
+  @@index([dealerId])
 }
 
 model Document {
-  allProjectCustomers Boolean @default(false)
-  portalVisible Boolean @default(false)
-  id         String    @id @default(uuid()) @db.Uuid
-  projectId  String    @db.Uuid
-  customerId String?   @db.Uuid
-  bookingId  String?   @db.Uuid
-  userId     String?   @db.Uuid
-  key        String    @unique
-  name       String
-  mime       String
-  size       Int
-  sha256     String
-  uploadedBy String    @db.Uuid
-  createdAt  DateTime  @default(now())
-  project    Project   @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  booking    Booking?  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
-  user       User?     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  allProjectCustomers Boolean   @default(false)
+  portalVisible       Boolean   @default(false)
+  id                  String    @id @default(uuid()) @db.Uuid
+  projectId           String    @db.Uuid
+  customerId          String?   @db.Uuid
+  bookingId           String?   @db.Uuid
+  userId              String?   @db.Uuid
+  key                 String    @unique
+  name                String
+  mime                String
+  size                Int
+  sha256              String
+  uploadedBy          String    @db.Uuid
+  createdAt           DateTime  @default(now())
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  customer            Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  booking             Booking?  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  user                User?     @relation(fields: [userId], references: [id], onDelete: Restrict)
 }
 
 model EmployeeLedgerEntry {
-  id            String   @id @default(uuid()) @db.Uuid
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId        String   @db.Uuid
   projectId     String?  @db.Uuid
   date          DateTime @default(now())
@@ -872,7 +924,7 @@ model EmployeeLedgerEntry {
   status        String   @default("POSTED")
   createdBy     String   @db.Uuid
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  updatedAt     DateTime @default(now()) @updatedAt
   user          User     @relation(fields: [userId], references: [id], onDelete: Restrict)
   project       Project? @relation(fields: [projectId], references: [id], onDelete: Restrict)
 
@@ -969,21 +1021,23 @@ model ReferenceCounter {
 }
 
 model ImageAsset {
-  id String @id @default(uuid()) @db.Uuid
-  projectId String? @db.Uuid
-  uploadedBy String @db.Uuid
-  purpose String
-  key String @unique
-  name String
-  mime String
-  size Int
-  createdAt DateTime @default(now())
-  users User[] @relation("UserPhoto")
-  projects Project[] @relation("ProjectPhoto")
-  units Unit[] @relation("UnitPhoto")
-  dealers Dealer[] @relation("DealerPhoto")
-  customers Customer[] @relation("CustomerPhoto")
-  payments Payment[] @relation("PaymentProof")
+  projectLogos Project[]  @relation("ProjectLogo")
+  id           String     @id @default(uuid()) @db.Uuid
+  projectId    String?    @db.Uuid
+  uploadedBy   String     @db.Uuid
+  purpose      String
+  key          String     @unique
+  name         String
+  mime         String
+  size         Int
+  createdAt    DateTime   @default(now())
+  users        User[]     @relation("UserPhoto")
+  projects     Project[]  @relation("ProjectPhoto")
+  units        Unit[]     @relation("UnitPhoto")
+  dealers      Dealer[]   @relation("DealerPhoto")
+  customers    Customer[] @relation("CustomerPhoto")
+  payments     Payment[]  @relation("PaymentProof")
+
   @@index([projectId, purpose])
   @@index([uploadedBy])
 }

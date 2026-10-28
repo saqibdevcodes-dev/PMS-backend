@@ -30,6 +30,7 @@ export const reportKinds = [
   'trial-balance',
   'income-statement',
   'balance-sheet',
+  'deal-profitability',
 ] as const;
 export const reportQuery = z
   .object({
@@ -119,6 +120,103 @@ async function queryReport(
           orderBy: { paidAt: 'desc' },
         })
       ).map(flat);
+    case 'deal-profitability': {
+      const purchases = await tx.propertyPurchase.findMany({
+        where: {
+          projectId,
+          status: { in: ['POSTED', 'DRAFT'] },
+          ...(q.from || q.to ? { purchaseDate: dates } : {}),
+        },
+        include: {
+          vendor: { select: { id: true, name: true, phone: true } },
+          unit: {
+            select: {
+              id: true,
+              number: true,
+              type: true,
+              phase: true,
+              size: true,
+              measurementUnit: true,
+              status: true,
+              price: true,
+              bookings: {
+                where: { status: { in: ['CONFIRMED', 'DRAFT'] } },
+                select: {
+                  id: true,
+                  reference: true,
+                  total: true,
+                  status: true,
+                  createdAt: true,
+                  customer: { select: { id: true, name: true, phone: true } },
+                  payments: {
+                    where: { status: 'CLEARED' },
+                    select: { amount: true },
+                  },
+                },
+                take: 1,
+              },
+            },
+          },
+          dealer: { select: { id: true, name: true } },
+        },
+        take,
+        orderBy: { purchaseDate: 'desc' },
+      });
+
+      return purchases.map((p) => {
+        const booking = p.unit?.bookings?.[0];
+        const extraExpenses = p.total.minus(p.price);
+        const salePrice = booking ? booking.total : null;
+        const netProfit = salePrice ? salePrice.minus(p.total) : null;
+        const profitMargin =
+          salePrice && p.total.gt(0)
+            ? netProfit!.div(p.total).mul(100).toFixed(1)
+            : null;
+        const collected = booking
+          ? sum(booking.payments.map((pm) => pm.amount)).toFixed(2)
+          : '0.00';
+
+        return {
+          id: p.id,
+          reference: p.reference,
+          fileReference: p.fileReference,
+          title: p.title,
+          location: p.location,
+          purchaseDate: p.purchaseDate.toISOString().slice(0, 10),
+          purchaseStatus: p.status,
+          sellerName: p.vendor?.name ?? '',
+          sellerPhone: p.vendor?.phone ?? '',
+          buyPrice: p.price.toFixed(2),
+          taxes: p.taxes.toFixed(2),
+          legalFees: p.legalFees.toFixed(2),
+          brokerage: p.brokerage.toFixed(2),
+          otherCosts: p.otherCosts.toFixed(2),
+          totalExpenses: extraExpenses.toFixed(2),
+          totalCost: p.total.toFixed(2),
+          unitNumber: p.unit?.number ?? '',
+          unitType: p.unit?.type ?? '',
+          unitPhase: p.unit?.phase ?? '',
+          unitSize: p.unit?.size
+            ? `${p.unit.size} ${p.unit.measurementUnit ?? ''}`.trim()
+            : '',
+          buyerName: booking?.customer?.name ?? '',
+          buyerPhone: booking?.customer?.phone ?? '',
+          bookingReference: booking?.reference ?? '',
+          bookingStatus: booking?.status ?? '',
+          salePrice: salePrice ? salePrice.toFixed(2) : '',
+          collectedAmount: collected,
+          netProfit: netProfit ? netProfit.toFixed(2) : '',
+          profitMarginPercent: profitMargin ? `${profitMargin}%` : '',
+          dealStatus: booking
+            ? booking.status === 'CONFIRMED'
+              ? 'SOLD'
+              : 'BOOKED'
+            : p.status === 'POSTED'
+              ? 'AVAILABLE'
+              : 'DRAFT',
+        };
+      });
+    }
     case 'customer-statement':
       return (await customerStatementReport(tx, projectId, q, limit)).rows;
     case 'installments':
@@ -480,6 +578,28 @@ export async function report(projectId: string, q: ReportQuery, limit = 1000) {
       balanced: assets.eq(liabilities.plus(equity)),
     });
   }
+  if (q.kind === 'deal-profitability') {
+    const totalBuy = sum(rows.map((r) => String(r.buyPrice || 0)));
+    const totalExp = sum(rows.map((r) => String(r.totalExpenses || 0)));
+    const totalCost = sum(rows.map((r) => String(r.totalCost || 0)));
+    const soldRows = rows.filter((r) => Boolean(r.salePrice));
+    const totalSales = sum(soldRows.map((r) => String(r.salePrice)));
+    const soldCost = sum(soldRows.map((r) => String(r.totalCost)));
+    const netProfit = totalSales.minus(soldCost);
+    const avgMargin = soldCost.gt(0) ? netProfit.div(soldCost).mul(100).toFixed(1) : '0.0';
+
+    Object.assign(summary, {
+      totalDeals: rows.length,
+      soldCount: soldRows.length,
+      availableCount: rows.length - soldRows.length,
+      totalBuyPrice: totalBuy.toFixed(2),
+      totalExpenses: totalExp.toFixed(2),
+      totalInvestedCost: totalCost.toFixed(2),
+      totalSalesRevenue: totalSales.toFixed(2),
+      totalNetProfit: netProfit.toFixed(2),
+      averageMarginPercent: avgMargin,
+    });
+  }
   return {
     kind: q.kind,
     summary,
@@ -487,6 +607,161 @@ export async function report(projectId: string, q: ReportQuery, limit = 1000) {
     count: rows.length,
     currency: (await db.project.findUniqueOrThrow({ where: { id: projectId } })).currency,
   };
+}
+
+export async function dealsProfitability(projectId: string) {
+  return transaction(async (tx) => {
+    const project = found(await tx.project.findUnique({ where: { id: projectId } }));
+    const purchases = await tx.propertyPurchase.findMany({
+      where: {
+        projectId,
+        status: { in: ['POSTED', 'DRAFT'] },
+      },
+      include: {
+        vendor: { select: { id: true, name: true, phone: true } },
+        unit: {
+          select: {
+            id: true,
+            number: true,
+            type: true,
+            phase: true,
+            block: true,
+            size: true,
+            measurementUnit: true,
+            status: true,
+            price: true,
+            bookings: {
+              where: { status: { in: ['CONFIRMED', 'DRAFT'] } },
+              select: {
+                id: true,
+                reference: true,
+                total: true,
+                status: true,
+                createdAt: true,
+                customer: { select: { id: true, name: true, phone: true } },
+                payments: {
+                  where: { status: 'CLEARED' },
+                  select: { amount: true },
+                },
+              },
+              take: 1,
+            },
+          },
+        },
+        dealer: { select: { id: true, name: true, phone: true } },
+        journal: { select: { id: true, reference: true } },
+      },
+      orderBy: { purchaseDate: 'desc' },
+    });
+
+    const deals = purchases.map((p) => {
+      const booking = p.unit?.bookings?.[0];
+      const extraExpenses = p.total.minus(p.price);
+      const salePrice = booking ? booking.total : null;
+      const netProfit = salePrice ? salePrice.minus(p.total) : null;
+      const profitMarginPercent =
+        salePrice && p.total.gt(0)
+          ? netProfit!.div(p.total).mul(100).toFixed(1)
+          : null;
+      const collectedAmount = booking
+        ? sum(booking.payments.map((pm) => pm.amount)).toFixed(2)
+        : '0.00';
+
+      const items = Array.isArray(p.expenseItems)
+        ? (p.expenseItems as Array<{ id?: string; name: string; category?: string; amount: string | number }>).map(
+            (i) => ({
+              id: i.id ?? '',
+              name: i.name,
+              category: i.category ?? 'Renovation & Building',
+              amount: String(i.amount),
+            }),
+          )
+        : [];
+
+      return {
+        id: p.id,
+        reference: p.reference,
+        fileReference: p.fileReference,
+        title: p.title,
+        location: p.location,
+        purchaseDate: p.purchaseDate.toISOString().slice(0, 10),
+        status: p.status,
+        seller: {
+          id: p.vendor?.id ?? '',
+          name: p.vendor?.name ?? '—',
+          phone: p.vendor?.phone ?? '',
+        },
+        buyPrice: p.price.toFixed(2),
+        expenses: {
+          taxes: p.taxes.toFixed(2),
+          legalFees: p.legalFees.toFixed(2),
+          brokerage: p.brokerage.toFixed(2),
+          otherCosts: p.otherCosts.toFixed(2),
+          items,
+          total: extraExpenses.toFixed(2),
+        },
+        totalCost: p.total.toFixed(2),
+        unit: p.unit
+          ? {
+              id: p.unit.id,
+              number: p.unit.number,
+              type: p.unit.type,
+              phase: p.unit.phase,
+              block: p.unit.block,
+              size: `${p.unit.size} ${p.unit.measurementUnit ?? ''}`.trim(),
+              status: p.unit.status,
+              listedPrice: p.unit.price.toFixed(2),
+            }
+          : null,
+        buyer: booking?.customer
+          ? {
+              id: booking.customer.id,
+              name: booking.customer.name,
+              phone: booking.customer.phone ?? '',
+              bookingId: booking.id,
+              bookingReference: booking.reference,
+              bookingStatus: booking.status,
+            }
+          : null,
+        salePrice: salePrice ? salePrice.toFixed(2) : null,
+        collected: collectedAmount,
+        netProfit: netProfit ? netProfit.toFixed(2) : null,
+        profitMarginPercent: profitMarginPercent ? `${profitMarginPercent}%` : null,
+        dealStatus: (booking
+          ? booking.status === 'CONFIRMED'
+            ? 'SOLD'
+            : 'BOOKED'
+          : p.status === 'POSTED'
+            ? 'AVAILABLE'
+            : 'DRAFT') as 'SOLD' | 'BOOKED' | 'AVAILABLE' | 'DRAFT',
+      };
+    });
+
+    const totalBuy = sum(deals.map((d) => d.buyPrice));
+    const totalExp = sum(deals.map((d) => d.expenses.total));
+    const totalCost = sum(deals.map((d) => d.totalCost));
+    const soldDeals = deals.filter((d) => d.salePrice !== null);
+    const totalSales = sum(soldDeals.map((d) => d.salePrice!));
+    const soldCost = sum(soldDeals.map((d) => d.totalCost));
+    const totalProfit = totalSales.minus(soldCost);
+    const avgMargin = soldCost.gt(0) ? totalProfit.div(soldCost).mul(100).toFixed(1) : '0.0';
+
+    return {
+      currency: project.currency,
+      summary: {
+        totalAcquisitions: deals.length,
+        soldCount: soldDeals.length,
+        availableCount: deals.length - soldDeals.length,
+        totalBuyPrice: totalBuy.toFixed(2),
+        totalExpenses: totalExp.toFixed(2),
+        totalInvestedCost: totalCost.toFixed(2),
+        totalSalesRevenue: totalSales.toFixed(2),
+        totalRealizedProfit: totalProfit.toFixed(2),
+        averageMarginPercent: avgMargin,
+      },
+      deals,
+    };
+  });
 }
 export async function dashboard(projectId: string, phase?: string) {
   const cacheKey = `pms:dashboard:${projectId}:${phase ?? ''}`;

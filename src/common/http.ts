@@ -7,6 +7,7 @@ import { db } from '../database/client.js';
 export const uuid = z.uuid();
 export const date = z.iso.date();
 export const password = z.string().min(12).max(128).regex(/[a-z]/).regex(/[A-Z]/).regex(/[0-9]/);
+
 export const pageQuery = z
   .object({
     page: z.coerce.number().int().min(1).default(1),
@@ -23,6 +24,7 @@ export const paginationQuery = pageQuery.pick({ page: true, limit: true, sort: t
 export function pagination(q: PageQuery) {
   return { skip: (q.page - 1) * q.limit, take: q.limit };
 }
+
 export function paged<T>(items: T[], total: number, q: PageQuery) {
   return {
     items,
@@ -42,6 +44,7 @@ type RouteDoc = {
   multipart?: boolean;
   status?: number;
 };
+
 export const routeDocs: RouteDoc[] = [];
 export function endpoint<
   B extends z.ZodType = z.ZodObject<Record<string, never>>,

@@ -11,6 +11,7 @@ export default defineConfig({
       'tests/portal.test.ts',
       'tests/form-images.test.ts',
       'tests/local-storage.test.ts',
+      'tests/project-branding.test.ts',
       'tests/email.test.ts',
     ],
     testTimeout: 20000,

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db } from '../../database/client.js';
 import { endpoint, id } from '../../common/http.js';
 import { found, requireState } from '../../common/errors.js';
-import { dashboard, report, reportQuery, queueExport } from './service.js';
+import { dashboard, report, reportQuery, queueExport, dealsProfitability } from './service.js';
 import { signedDownload } from '../../integrations/storage.js';
 const root = '/projects/:projectId';
 export function reportRoutes(app: Express) {
@@ -17,6 +17,16 @@ export function reportRoutes(app: Express) {
       query: z.object({ phase: z.string().max(100).optional() }).strict(),
     },
     async (ctx, _b, q) => dashboard(ctx.projectId, q.phase),
+  );
+  endpoint(
+    app,
+    'get',
+    root + '/deal-profitability',
+    {
+      permission: 'reports.read',
+      summary: 'Property acquisition, renovation expenses, buyer resale prices, and profit margins',
+    },
+    async (ctx) => dealsProfitability(ctx.projectId),
   );
   endpoint(
     app,

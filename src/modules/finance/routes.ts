@@ -16,6 +16,16 @@ import { money } from '../../common/money.js';
 import { found, requireState } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
 import { postJournal, reverseJournal } from './service.js';
+import { purchaseRoutes } from './purchases.js';
+const vendorBody = z
+  .object({
+    name: z.string().trim().min(2).max(200),
+    phone: z.string().trim().min(6).max(30),
+    category: z.enum(['SELLER', 'SUPPLIER', 'CONTRACTOR', 'MULTI_ROLE']).default('SUPPLIER'),
+    email: z.email().max(254).nullable().optional(),
+    address: z.string().trim().max(1000).default(''),
+  })
+  .strict();
 const root = '/projects/:projectId';
 const journalBody = z
   .object({
@@ -32,6 +42,7 @@ const journalBody = z
   })
   .strict();
 export function financeRoutes(app: Express) {
+  purchaseRoutes(app);
   endpoint(
     app,
     'get',
@@ -168,6 +179,30 @@ export function financeRoutes(app: Express) {
   );
   endpoint(
     app,
+    'get',
+    root + '/journals/:id',
+    { permission: 'finance.read', summary: 'Get a project journal voucher with ledger details' },
+    async (ctx, _b, _q, req) =>
+      found(
+        await db.journal.findFirst({
+          where: { id: id(req), projectId: ctx.projectId },
+          include: {
+            project: { select: { id: true, name: true, currency: true, logoId: true } },
+            lines: {
+              include: {
+                account: { select: { code: true, name: true } },
+                vendor: { select: { name: true } },
+              },
+              orderBy: { id: 'asc' },
+            },
+            reversal: { select: { reference: true } },
+            reversalOf: { select: { reference: true } },
+          },
+        }),
+      ),
+  );
+  endpoint(
+    app,
     'post',
     root + '/journals/:id/reverse',
     {
@@ -265,11 +300,49 @@ export function financeRoutes(app: Express) {
     {
       permission: 'finance.post',
       summary: 'Register project vendor',
-      body: z
-        .object({ name: z.string().min(2).max(200), phone: z.string().min(6).max(30) })
-        .strict(),
+      body: vendorBody,
     },
-    async (ctx, b) => db.vendor.create({ data: { ...b, projectId: ctx.projectId } }),
+    async (ctx, b) =>
+      transaction(async (tx) => {
+        const vendor = await tx.vendor.create({ data: { ...b, projectId: ctx.projectId } });
+        await audit(tx, ctx, 'vendor.created', vendor.id);
+        return vendor;
+      }),
+  );
+  endpoint(
+    app,
+    'patch',
+    root + '/vendors/:id',
+    {
+      permission: 'finance.post',
+      summary: 'Update seller or supplier contact details',
+      body: vendorBody,
+    },
+    async (ctx, b, _q, req) =>
+      transaction(async (tx) => {
+        await lock(tx, 'Project', ctx.projectId);
+        found(await tx.vendor.findFirst({ where: { id: id(req), projectId: ctx.projectId } }));
+        requireState(
+          ['SELLER', 'MULTI_ROLE'].includes(b.category) ||
+            !(await tx.propertyPurchase.count({
+              where: { vendorId: id(req), status: { not: 'VOIDED' } },
+            })),
+          'SELLER_IN_USE',
+          'This contact has property purchases. Keep Seller or Multi-role selected.',
+          422,
+        );
+        const vendor = await tx.vendor.update({ where: { id: id(req) }, data: b });
+        await audit(tx, ctx, 'vendor.updated', vendor.id);
+        return vendor;
+      }),
+  );
+  endpoint(
+    app,
+    'get',
+    root + '/vendors/:id',
+    { permission: 'finance.read', summary: 'Get seller or supplier details' },
+    async (ctx, _b, _q, req) =>
+      found(await db.vendor.findFirst({ where: { id: id(req), projectId: ctx.projectId } })),
   );
   endpoint(
     app,
@@ -278,12 +351,16 @@ export function financeRoutes(app: Express) {
     {
       permission: 'finance.read',
       summary: 'List project vendors',
-      query: paginationQuery.extend({ search: z.string().max(200).optional() }),
+      query: paginationQuery.extend({
+        search: z.string().max(200).optional(),
+        role: z.enum(['SELLER']).optional(),
+      }),
     },
     async (ctx, _b, q) => {
       const where = {
         projectId: ctx.projectId,
         ...(q.search ? { name: { contains: q.search, mode: 'insensitive' as const } } : {}),
+        ...(q.role === 'SELLER' ? { category: { in: ['SELLER', 'MULTI_ROLE'] } } : {}),
       };
       const [items, total] = await Promise.all([
         db.vendor.findMany({

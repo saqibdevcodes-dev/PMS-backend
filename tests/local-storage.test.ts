@@ -49,6 +49,13 @@ afterEach(async () => {
 });
 
 describe('local uploads and private downloads', () => {
+  it('reads document artwork with a size limit and rejects traversal and missing files', async () => {
+    await storage.put('images/logo.png', png);
+    expect(await storage.read('images/logo.png', 1024)).toEqual(png);
+    await expect(storage.read('images/logo.png', 1)).rejects.toThrow();
+    await expect(storage.read('../outside.png', 1024)).rejects.toThrow();
+    await expect(storage.read('images/missing.png', 1024)).rejects.toThrow();
+  });
   it('persists image bytes and serves them after recreating the storage instance', async () => {
     await storage.put('images/photo.png', png);
     const url = storage.signedDownload('images/photo.png', 'photo.png', true);

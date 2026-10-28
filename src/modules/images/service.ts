@@ -3,6 +3,7 @@ import type { Context } from '../../common/context.js';
 import { found, requireState } from '../../common/errors.js';
 export const purposes = [
   'PROJECT',
+  'PROJECT_LOGO',
   'UNIT',
   'FEATURE',
   'CUSTOMER',
@@ -12,6 +13,10 @@ export const purposes = [
 ] as const;
 export type ImagePurpose = (typeof purposes)[number];
 export const imageGrants: Record<ImagePurpose, { write: string[]; read: string[] }> = {
+  PROJECT_LOGO: {
+    write: ['projects.create', 'projects.update'],
+    read: ['projects.read', 'payments.read', 'finance.read', 'reports.read', 'documents.read'],
+  },
   PROJECT: { write: ['projects.create', 'projects.update'], read: ['projects.read'] },
   UNIT: { write: ['inventory.create', 'inventory.update'], read: ['inventory.read'] },
   FEATURE: { write: ['inventory.create', 'inventory.update'], read: ['inventory.read'] },
@@ -28,12 +33,15 @@ export async function requireImage(
 ) {
   if (!imageId) return;
   const image = found(await tx.imageAsset.findUnique({ where: { id: imageId } }));
-  const projectScoped = !['PROJECT', 'USER'].includes(purpose);
+  const projectScoped = !['PROJECT', 'PROJECT_LOGO', 'USER'].includes(purpose);
   requireState(
     image.purpose === purpose &&
       (projectScoped
         ? image.projectId === ctx.projectId
         : image.uploadedBy === ctx.actor.id ||
+          (purpose === 'PROJECT_LOGO' &&
+            !!ctx.projectId &&
+            !!(await tx.project.findFirst({ where: { id: ctx.projectId, logoId: image.id } }))) ||
           (purpose === 'PROJECT' &&
             !!ctx.projectId &&
             !!(await tx.project.findFirst({

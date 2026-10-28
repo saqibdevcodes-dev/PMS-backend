@@ -51,6 +51,7 @@ import { salesRoutes } from '../src/modules/sales/routes.js';
 import { signedDownload, putObject } from '../src/integrations/storage.js';
 import { login } from '../src/modules/auth/service.js';
 import { workflowRoutes } from '../src/modules/workflows/routes.js';
+import { financeRoutes } from '../src/modules/finance/routes.js';
 import { transferChecks, possessionChecks, handoverReceipt } from './ownership-fixtures.js';
 import { decrypt } from '../src/common/security.js';
 import { resendCredentials, deliverCredentials } from '../src/modules/portal/credentials.js';
@@ -69,6 +70,7 @@ crmRoutes(app);
 documentRoutes(app);
 salesRoutes(app);
 workflowRoutes(app);
+financeRoutes(app);
 const errors: ErrorRequestHandler = (error, _req, res, _next) => {
   res
     .status(
@@ -1450,6 +1452,269 @@ describe('private record images and guided form contracts', () => {
 });
 
 describe('simplified project and payment workflows', () => {
+  it('posts and reverses acquisition costs once, separates seller debt from other accruals and locks posted costs', async () => {
+    const project = await post('/projects').send({ name: 'Acquisitions', location: 'Lahore' });
+    const pid = project.body.data.id;
+    const base = '/projects/' + pid;
+    const seller = await post(base + '/vendors').send({
+      name: 'Land seller',
+      phone: '03001234567',
+      category: 'SELLER',
+      email: 'seller@example.invalid',
+    });
+    expect(seller.status, seller.text).toBe(200);
+    const input = {
+      vendorId: seller.body.data.id,
+      title: 'Land for development',
+      location: 'Lahore',
+      purchaseDate: new Date().toISOString().slice(0, 10),
+      price: '1000000.10',
+      taxes: '10000.20',
+      legalFees: '5000.30',
+      brokerage: '500.40',
+      otherCosts: '20.50',
+      fileReference: 'DEED-100',
+    };
+    const created = await post(base + '/property-purchases').send(input);
+    expect(created.status, created.text).toBe(201);
+    const purchase = created.body.data;
+    expect(decimal(purchase.total).toFixed(2)).toBe('1015521.50');
+    expect(purchase.status).toBe('DRAFT');
+    expect(await db.journal.count({ where: { projectId: pid } })).toBe(0);
+    const url = base + '/property-purchases/' + purchase.id;
+    expect(
+      (await get('/projects/' + projectId + '/property-purchases/' + purchase.id)).status,
+    ).toBe(404);
+    expect(
+      (
+        await post(url + '/post', 'viewer').send({
+          expectedTotal: purchase.total,
+          expectedUpdatedAt: purchase.updatedAt,
+        })
+      ).status,
+    ).toBe(403);
+    const changed = await request(app)
+      .patch('/api/v1' + url)
+      .set('Authorization', 'Bearer staff')
+      .send({ ...input, title: 'Reviewed acquisition' });
+    expect(changed.status, changed.text).toBe(200);
+    expect(
+      (
+        await post(url + '/post').send({
+          expectedTotal: purchase.total,
+          expectedUpdatedAt: purchase.updatedAt,
+        })
+      ).body.code,
+    ).toBe('PURCHASE_CHANGED');
+    const confirmation = {
+      expectedTotal: changed.body.data.total,
+      expectedUpdatedAt: changed.body.data.updatedAt,
+    };
+    const posted = await post(url + '/post').send(confirmation);
+    expect(posted.status, posted.text).toBe(200);
+    expect(posted.body.data.status).toBe('POSTED');
+    expect((await post(url + '/post').send(confirmation)).body.data.journalId).toBe(
+      posted.body.data.journalId,
+    );
+    const journal = await db.journal.findUniqueOrThrow({
+      where: { id: posted.body.data.journalId },
+      include: { lines: { include: { account: true } } },
+    });
+    expect(sum(journal.lines.map((l) => l.debit)).toFixed(2)).toBe('1015521.50');
+    expect(sum(journal.lines.map((l) => l.credit)).toFixed(2)).toBe('1015521.50');
+    expect(journal.lines.find((l) => l.vendorId === seller.body.data.id)?.credit.toFixed(2)).toBe(
+      '1000000.10',
+    );
+    expect(
+      journal.lines.find((l) => l.account.code === 'SYS-ACQUISITION-ACCRUALS')?.credit.toFixed(2),
+    ).toBe('15521.40');
+    expect(
+      await db.journal.count({ where: { source: 'PROPERTY_PURCHASE', sourceId: purchase.id } }),
+    ).toBe(1);
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1' + url)
+          .set('Authorization', 'Bearer staff')
+          .send({ ...input, price: '1' })
+      ).body.code,
+    ).toBe('PURCHASE_LOCKED');
+    expect(
+      (await post(base + '/journals/' + journal.id + '/reverse').send({ reason: 'Wrong workflow' }))
+        .body.code,
+    ).toBe('DOMAIN_REVERSAL_REQUIRED');
+    const reversed = await post(url + '/void').send({ reason: 'Purchase agreement cancelled' });
+    expect(reversed.status, reversed.text).toBe(200);
+    expect(reversed.body.data.status).toBe('VOIDED');
+    expect(
+      (await post(url + '/void').send({ reason: 'Purchase agreement cancelled' })).body.data
+        .reversalId,
+    ).toBe(reversed.body.data.reversalId);
+    const reversals = await db.journal.findMany({
+      where: { reversalOfId: journal.id },
+      include: { lines: true },
+    });
+    expect(reversals).toHaveLength(1);
+    expect(
+      sum(reversals[0]!.lines.map((l) => l.credit)).eq(sum(journal.lines.map((l) => l.debit))),
+    ).toBe(true);
+    expect((await post(url + '/post').send(confirmation)).body.code).toBe('PURCHASE_CHANGED');
+  });
+  it('validates purchase sellers and costs and leaves drafts unchanged when accounting is locked', async () => {
+    const project = await post('/projects').send({
+      name: 'Purchase validation',
+      location: 'Lahore',
+    });
+    const pid = project.body.data.id,
+      base = '/projects/' + pid;
+    const supplier = await post(base + '/vendors').send({ name: 'Supplier', phone: '03001234567' });
+    const input = {
+      vendorId: supplier.body.data.id,
+      title: 'Purchase test',
+      location: 'Lahore',
+      purchaseDate: new Date().toISOString().slice(0, 10),
+      price: '200',
+      fileReference: 'TEST-200',
+    };
+    expect((await post(base + '/property-purchases').send(input)).body.code).toBe(
+      'SELLER_REQUIRED',
+    );
+    await request(app)
+      .patch('/api/v1' + base + '/vendors/' + supplier.body.data.id)
+      .set('Authorization', 'Bearer staff')
+      .send({ name: 'Seller', phone: '03001234567', category: 'SELLER' });
+    expect((await post('/projects/' + projectId + '/property-purchases').send(input)).status).toBe(
+      404,
+    );
+    expect((await post(base + '/property-purchases').send({ ...input, price: '-1' })).status).toBe(
+      422,
+    );
+    const created = await post(base + '/property-purchases').send(input);
+    expect(created.status, created.text).toBe(201);
+    expect((await post(base + '/property-purchases').send(input)).status).not.toBe(201);
+    const p = created.body.data;
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1' + base + '/vendors/' + supplier.body.data.id)
+          .set('Authorization', 'Bearer staff')
+          .send({ name: 'Supplier', phone: '03001234567', category: 'SUPPLIER' })
+      ).body.code,
+    ).toBe('SELLER_IN_USE');
+    await db.accountingPeriod.updateMany({ where: { projectId: pid }, data: { locked: true } });
+    expect(
+      (
+        await post(base + '/property-purchases/' + p.id + '/post').send({
+          expectedTotal: p.total,
+          expectedUpdatedAt: p.updatedAt,
+        })
+      ).body.code,
+    ).toBe('ACCOUNTING_PERIOD_CLOSED');
+    expect((await db.propertyPurchase.findUniqueOrThrow({ where: { id: p.id } })).status).toBe(
+      'DRAFT',
+    );
+    expect(await db.journal.count({ where: { projectId: pid } })).toBe(0);
+    const future = await post(base + '/property-purchases').send({
+      ...input,
+      purchaseDate: '2099-01-01',
+      fileReference: 'FUTURE-200',
+    });
+    expect(
+      (
+        await post(base + '/property-purchases/' + future.body.data.id + '/post').send({
+          expectedTotal: future.body.data.total,
+          expectedUpdatedAt: future.body.data.updatedAt,
+        })
+      ).body.code,
+    ).toBe('FUTURE_PURCHASE');
+  });
+  it('keeps project logos independent of galleries, scoped to members, replaceable and removable', async () => {
+    const logoId = await upload('PROJECT_LOGO');
+    const photoId = await upload('PROJECT');
+    expect((await get('/images/' + logoId, 'other')).status).toBe(404);
+    const created = await post('/projects').send({
+      name: 'Branded project',
+      location: 'Lahore',
+      logoId,
+      photoIds: [photoId],
+    });
+    expect(created.status, created.text).toBe(201);
+    const pid = created.body.data.id;
+    const patch = (body: object, token = 'staff') =>
+      request(app)
+        .patch('/api/v1/projects/' + pid)
+        .set('Authorization', 'Bearer ' + token)
+        .send(body);
+    expect(created.body.data).toMatchObject({ logoId, photoId, photoIds: [photoId] });
+    expect((await get('/projects/' + pid + '/branding', 'viewer')).body.data).toMatchObject({
+      logoId,
+      name: 'Branded project',
+    });
+    expect((await get('/projects/' + pid + '/branding', 'other')).status).toBe(404);
+    expect((await get('/images/' + logoId, 'customer')).status).toBe(404);
+    await db.customer.create({
+      data: {
+        projectId: pid,
+        reference: randomUUID(),
+        name: 'Linked portal',
+        phone: '03001234567',
+        identityEncrypted: 'test',
+        identityHash: randomUUID(),
+        identityLast4: '1234',
+        portalUserId: staffId,
+      },
+    });
+    expect((await get('/images/' + logoId, 'customer')).status).toBe(200);
+    await db.userProjectAccess.create({ data: { userId: otherId, projectId: pid } });
+    expect((await get('/images/' + logoId, 'other')).status).toBe(200);
+    expect((await patch({ logoId }, 'other')).status).toBe(200);
+    expect((await patch({ logoId: photoId })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
+    const foreign = await db.imageAsset.create({
+      data: {
+        purpose: 'PROJECT_LOGO',
+        uploadedBy: otherId,
+        key: 'foreign.png',
+        name: 'foreign.png',
+        mime: 'image/png',
+        size: 42,
+      },
+    });
+    expect((await patch({ logoId: foreign.id })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
+    expect((await patch({ logoId: await upload('PROJECT_LOGO') })).status).toBe(200);
+    expect((await get('/images/' + logoId, 'customer')).status).toBe(404);
+    const removed = await patch({ logoId: null });
+    expect(removed.body.data).toMatchObject({ logoId: null, photoId, photoIds: [photoId] });
+    const unchanged = await patch({ description: 'Updated details' });
+    expect(unchanged.body.data.logoId).toBeNull();
+    expect((await patch({ logoId }, 'viewer')).status).toBe(403);
+  });
+  it('returns ledger names and project branding for vouchers without allowing cross-project reads', async () => {
+    const created = await post('/projects').send({ name: 'Voucher project', location: 'Karachi' });
+    const pid = created.body.data.id;
+    const base = '/projects/' + pid;
+    const accounts = await db.account.findMany({
+      where: { projectId: pid },
+      orderBy: { code: 'asc' },
+    });
+    const journal = await post(base + '/journals').send({
+      description: 'Opening capital voucher',
+      postedAt: new Date().toISOString(),
+      lines: [
+        { accountId: accounts[0]!.id, debit: '100', credit: '0' },
+        { accountId: accounts[1]!.id, debit: '0', credit: '100' },
+      ],
+    });
+    expect(journal.status, journal.text).toBe(200);
+    const voucher = await get(base + '/journals/' + journal.body.data.id);
+    expect(voucher.status, voucher.text).toBe(200);
+    expect(voucher.body.data.project).toMatchObject({ id: pid, logoId: null, currency: 'PKR' });
+    expect(voucher.body.data.lines).toHaveLength(2);
+    expect(voucher.body.data.lines[0].account.name).toBeTruthy();
+    expect((await get(base + '/journals/' + journal.body.data.id, 'viewer')).status).toBe(403);
+    expect((await get('/projects/' + projectId + '/journals/' + journal.body.data.id)).status).toBe(
+      404,
+    );
+  });
   it('generates unique readable codes, persists amenities, and keeps minimum payments in settings', async () => {
     const featureImage = await upload('PROJECT');
     const body = {

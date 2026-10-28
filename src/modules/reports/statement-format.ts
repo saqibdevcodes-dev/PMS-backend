@@ -13,7 +13,13 @@ export type StatementSection = {
   rows: Record<string, string | null>[];
 };
 export type AccountStatement = {
-  project: { name: string; currency: string; timezone: string };
+  project: {
+    id?: string;
+    logoId?: string | null;
+    name: string;
+    currency: string;
+    timezone: string;
+  };
   customer: {
     id?: string;
     name: string;

@@ -6,6 +6,7 @@ import { decimal, sum } from '../../common/money.js';
 import { ownedBookings } from './access.js';
 
 export const projectSelect = {
+  logoId: true,
   id: true,
   name: true,
   currency: true,

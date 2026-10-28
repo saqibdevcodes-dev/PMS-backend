@@ -46,6 +46,8 @@ export function responseSchema(path: string, method: string, hasPagination: bool
     return object({ url: { type: 'string', format: 'uri' }, expiresIn: num });
   if (path.endsWith('/revoke-sessions') || method === 'delete') return result('revoked');
   if (path.endsWith('/cancel') || path.endsWith('/withdraw')) return result('cancelled');
+  if (path.endsWith('/list-for-sale'))
+    return object({ purchase: ref('PropertyPurchase'), unit: ref('Unit') });
   if (path.endsWith('/import')) return object({ imported: num });
   if (path.endsWith('/identity')) return object({ identity: str });
   if (path.endsWith('/access') || path === '/roles/:id') return result('updated');
@@ -100,6 +102,47 @@ export function responseSchema(path: string, method: string, hasPagination: bool
       upcomingInstallments: num,
       upcomingAmount: ref('Money'),
       activeDealers: num,
+    });
+  if (path.endsWith('/deal-profitability'))
+    return object({
+      currency: str,
+      summary: object({
+        totalAcquisitions: num,
+        soldCount: num,
+        availableCount: num,
+        totalBuyPrice: ref('Money'),
+        totalExpenses: ref('Money'),
+        totalInvestedCost: ref('Money'),
+        totalSalesRevenue: ref('Money'),
+        totalNetProfit: ref('Money'),
+        averageMarginPercent: str,
+      }),
+      deals: array(
+        object({
+          id: str,
+          reference: str,
+          fileReference: str,
+          title: str,
+          location: str,
+          purchaseDate: str,
+          status: str,
+          seller: object({ id: str, name: str, phone: str }),
+          buyPrice: ref('Money'),
+          expenses: object({
+            taxes: ref('Money'),
+            legalFees: ref('Money'),
+            brokerage: ref('Money'),
+            otherCosts: ref('Money'),
+            total: ref('Money'),
+          }),
+          totalCost: ref('Money'),
+          salePrice: { type: ['string', 'null'] },
+          collected: ref('Money'),
+          netProfit: { type: ['string', 'null'] },
+          profitMarginPercent: { type: ['string', 'null'] },
+          dealStatus: str,
+        }),
+      ),
     });
   if (path.endsWith('/reports')) {
     const schema = object({
@@ -243,6 +286,7 @@ export function responseSchema(path: string, method: string, hasPagination: bool
     settings: 'ProjectSetting',
     'bank-accounts': 'BankAccount',
     vendors: 'Vendor',
+    'property-purchases': 'PropertyPurchase',
     audit: 'AuditLog',
     documents: 'Document',
     'document-templates': 'DocumentTemplate',

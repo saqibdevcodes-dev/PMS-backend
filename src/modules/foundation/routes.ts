@@ -27,6 +27,7 @@ const projectBody = z
   .object({
     name: z.string().min(2).max(200),
     location: z.string().trim().min(2).max(300),
+    logoId: uuid.nullable().optional(),
     description: z.string().max(4000).default(''),
     features: z.array(z.string().min(1).max(100)).max(30).default([]),
     featureImages: z
@@ -164,6 +165,7 @@ export function foundationRoutes(app: Express) {
     async (ctx, body) =>
       transaction(async (tx) => {
         const gallery = await requireGalleryImages(tx, ctx, body, 'PROJECT');
+        await requireImage(tx, ctx, body.logoId, 'PROJECT_LOGO');
         for (const item of body.featureImages) {
           requireState(
             body.features.includes(item.feature),
@@ -209,6 +211,7 @@ export function foundationRoutes(app: Express) {
         await lock(tx, 'Project', ctx.projectId);
         const current = found(await tx.project.findUnique({ where: { id: ctx.projectId } }));
         const gallery = await requireGalleryImages(tx, ctx, body, 'PROJECT', current);
+        await requireImage(tx, ctx, body.logoId, 'PROJECT_LOGO');
         for (const item of body.featureImages ?? []) {
           requireState(
             (body.features ?? current.features).includes(item.feature),
@@ -243,6 +246,22 @@ export function foundationRoutes(app: Express) {
       });
       return { ...project, availableProperties };
     },
+  );
+  endpoint(
+    app,
+    'get',
+    '/projects/:projectId/branding',
+    {
+      summary: 'Project branding for documents, restricted to assigned staff',
+      response: z.object({ id: uuid, name: z.string(), logoId: uuid.nullable() }),
+    },
+    async (ctx) =>
+      found(
+        await db.project.findUnique({
+          where: { id: ctx.projectId },
+          select: { id: true, name: true, logoId: true },
+        }),
+      ),
   );
   endpoint(
     app,

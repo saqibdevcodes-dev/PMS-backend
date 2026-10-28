@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { drawDocumentBrand, type DocumentBranding } from './project-branding.js';
 import { DateTime } from 'luxon';
 import {
   type AccountStatement,
@@ -13,7 +14,10 @@ const ink = '#203249',
   muted = '#65758a',
   line = '#dfe6ee';
 
-export function statementPdf(statement: AccountStatement): Promise<Buffer> {
+export function statementPdf(
+  statement: AccountStatement,
+  branding?: DocumentBranding,
+): Promise<Buffer> {
   return new Promise((resolvePdf, reject) => {
     const doc = new PDFDocument({
       size: 'A4',
@@ -21,7 +25,7 @@ export function statementPdf(statement: AccountStatement): Promise<Buffer> {
       bufferPages: true,
       info: {
         Title: 'Customer account statement',
-        Author: 'Etihad Real Estate',
+        Author: branding?.name ?? 'Etihad Real Estate',
         Subject: statement.customer.reference,
       },
     });
@@ -66,7 +70,7 @@ export function statementPdf(statement: AccountStatement): Promise<Buffer> {
           .stroke();
       const newPage = () => {
         doc.addPage();
-        text('ETIHAD REAL ESTATE', left, 32, width / 2, 9, true, blue);
+        text(branding?.name ?? 'ETIHAD REAL ESTATE', left, 32, width / 2, 9, true, blue);
         text('ACCOUNT STATEMENT', left + width / 2, 32, width / 2, 8, false, muted, 'right');
         rule(53);
         y = 70;
@@ -81,7 +85,8 @@ export function statementPdf(statement: AccountStatement): Promise<Buffer> {
         text(value, left + 12, y + 10, width - 24, 8.5, false, muted);
         y += h + 9;
       };
-      if (existsSync(logo)) doc.image(logo, left, y, { fit: [156, 49] });
+      if (branding) drawDocumentBrand(doc, branding, left, y);
+      else if (existsSync(logo)) doc.image(logo, left, y, { fit: [156, 49] });
       else text('ETIHAD\nREAL ESTATE', left, y, width / 2, 14, true, blue);
       text('CUSTOMER COPY', left + width / 2, y + 3, width / 2, 8, true, blue, 'right');
       text(

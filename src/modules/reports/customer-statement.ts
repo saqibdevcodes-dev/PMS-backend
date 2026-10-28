@@ -25,7 +25,7 @@ export async function customerStatementReport(
   const project = found(
     await tx.project.findUnique({
       where: { id: projectId },
-      select: { name: true, currency: true, timezone: true },
+      select: { id: true, name: true, logoId: true, currency: true, timezone: true },
     }),
   );
   const customer = found(
