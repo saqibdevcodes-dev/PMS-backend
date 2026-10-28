@@ -17,10 +17,8 @@ import { found } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
 import * as sales from './service.js';
 import { bookingInput, paymentTerms } from './payment-plan.js';
-import { dealerRoutes } from './dealers.js';
 const root = '/projects/:projectId';
 export function salesRoutes(app: Express) {
-  dealerRoutes(app);
   endpoint(
     app,
     'post',
