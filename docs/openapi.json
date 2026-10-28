@@ -23808,6 +23808,30 @@
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "object",
                 "properties": {
+                  "unitId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "dealerId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "vendorId": {
                     "type": "string",
                     "format": "uuid",
@@ -23815,7 +23839,7 @@
                   },
                   "title": {
                     "type": "string",
-                    "minLength": 3,
+                    "minLength": 2,
                     "maxLength": 200
                   },
                   "location": {
@@ -23851,6 +23875,36 @@
                     "default": "0",
                     "type": "string",
                     "pattern": "^(0|[1-9]\\d{0,15})(\\.\\d{1,2})?$"
+                  },
+                  "expenseItems": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "default": "5e4ed281-b9f8-47e3-9aa4-be6140177069",
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "category": {
+                          "default": "Renovation & Building",
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9]\\d{0,15})(\\.\\d{1,2})?$"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "amount"
+                      ]
+                    }
                   },
                   "fileReference": {
                     "type": "string",
@@ -24186,6 +24240,30 @@
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "object",
                 "properties": {
+                  "unitId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "dealerId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "vendorId": {
                     "type": "string",
                     "format": "uuid",
@@ -24193,7 +24271,7 @@
                   },
                   "title": {
                     "type": "string",
-                    "minLength": 3,
+                    "minLength": 2,
                     "maxLength": 200
                   },
                   "location": {
@@ -24229,6 +24307,36 @@
                     "default": "0",
                     "type": "string",
                     "pattern": "^(0|[1-9]\\d{0,15})(\\.\\d{1,2})?$"
+                  },
+                  "expenseItems": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "default": "b924b8e8-1956-4443-9b3f-7af117ae74ed",
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "category": {
+                          "default": "Renovation & Building",
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9]\\d{0,15})(\\.\\d{1,2})?$"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "amount"
+                      ]
+                    }
                   },
                   "fileReference": {
                     "type": "string",
@@ -24724,6 +24832,191 @@
           }
         },
         "x-permission": "finance.reverse",
+        "x-audience": "staff"
+      }
+    },
+    "/projects/{projectId}/property-purchases/{id}/list-for-sale": {
+      "post": {
+        "operationId": "post__projects__projectId_property_purchases__id_list_for_sale",
+        "summary": "Move an investment-finalized property to active selling inventory with asking price",
+        "tags": [
+          "property-purchases"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "askingPrice": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9]\\d{0,15})(\\.\\d{1,2})?$"
+                  }
+                },
+                "required": [
+                  "askingPrice"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation. Monetary model fields are decimal strings. Lists with pagination return items and pagination inside data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "purchase": {
+                          "$ref": "#/components/schemas/PropertyPurchase"
+                        },
+                        "unit": {
+                          "$ref": "#/components/schemas/Unit"
+                        }
+                      },
+                      "required": [
+                        "purchase",
+                        "unit"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "requestId"
+                      ],
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, expired or revoked session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission, origin or separation-of-duties denial",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record missing or outside project scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Workflow, uniqueness or concurrency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation or business rule failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Distributed rate limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-permission": "inventory.create",
         "x-audience": "staff"
       }
     },
@@ -29769,6 +30062,325 @@
         "x-audience": "staff"
       }
     },
+    "/projects/{projectId}/deal-profitability": {
+      "get": {
+        "operationId": "get__projects__projectId_deal_profitability",
+        "summary": "Property acquisition, renovation expenses, buyer resale prices, and profit margins",
+        "tags": [
+          "deal-profitability"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation. Monetary model fields are decimal strings. Lists with pagination return items and pagination inside data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "success": {
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "currency": {
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "totalAcquisitions": {
+                              "type": "integer"
+                            },
+                            "soldCount": {
+                              "type": "integer"
+                            },
+                            "availableCount": {
+                              "type": "integer"
+                            },
+                            "totalBuyPrice": {
+                              "$ref": "#/components/schemas/Money"
+                            },
+                            "totalExpenses": {
+                              "$ref": "#/components/schemas/Money"
+                            },
+                            "totalInvestedCost": {
+                              "$ref": "#/components/schemas/Money"
+                            },
+                            "totalSalesRevenue": {
+                              "$ref": "#/components/schemas/Money"
+                            },
+                            "totalNetProfit": {
+                              "$ref": "#/components/schemas/Money"
+                            },
+                            "averageMarginPercent": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "totalAcquisitions",
+                            "soldCount",
+                            "availableCount",
+                            "totalBuyPrice",
+                            "totalExpenses",
+                            "totalInvestedCost",
+                            "totalSalesRevenue",
+                            "totalNetProfit",
+                            "averageMarginPercent"
+                          ]
+                        },
+                        "deals": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "reference": {
+                                "type": "string"
+                              },
+                              "fileReference": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "location": {
+                                "type": "string"
+                              },
+                              "purchaseDate": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "seller": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "phone": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "phone"
+                                ]
+                              },
+                              "buyPrice": {
+                                "$ref": "#/components/schemas/Money"
+                              },
+                              "expenses": {
+                                "type": "object",
+                                "properties": {
+                                  "taxes": {
+                                    "$ref": "#/components/schemas/Money"
+                                  },
+                                  "legalFees": {
+                                    "$ref": "#/components/schemas/Money"
+                                  },
+                                  "brokerage": {
+                                    "$ref": "#/components/schemas/Money"
+                                  },
+                                  "otherCosts": {
+                                    "$ref": "#/components/schemas/Money"
+                                  },
+                                  "total": {
+                                    "$ref": "#/components/schemas/Money"
+                                  }
+                                },
+                                "required": [
+                                  "taxes",
+                                  "legalFees",
+                                  "brokerage",
+                                  "otherCosts",
+                                  "total"
+                                ]
+                              },
+                              "totalCost": {
+                                "$ref": "#/components/schemas/Money"
+                              },
+                              "salePrice": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "collected": {
+                                "$ref": "#/components/schemas/Money"
+                              },
+                              "netProfit": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "profitMarginPercent": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "dealStatus": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "reference",
+                              "fileReference",
+                              "title",
+                              "location",
+                              "purchaseDate",
+                              "status",
+                              "seller",
+                              "buyPrice",
+                              "expenses",
+                              "totalCost",
+                              "salePrice",
+                              "collected",
+                              "netProfit",
+                              "profitMarginPercent",
+                              "dealStatus"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "currency",
+                        "summary",
+                        "deals"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "requestId"
+                      ],
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, expired or revoked session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission, origin or separation-of-duties denial",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record missing or outside project scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Workflow, uniqueness or concurrency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation or business rule failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Distributed rate limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-permission": "reports.read",
+        "x-audience": "staff"
+      }
+    },
     "/projects/{projectId}/reports": {
       "get": {
         "operationId": "get__projects__projectId_reports",
@@ -29818,7 +30430,8 @@
                 "bank-book",
                 "trial-balance",
                 "income-statement",
-                "balance-sheet"
+                "balance-sheet",
+                "deal-profitability"
               ]
             }
           },
@@ -30281,7 +30894,8 @@
                           "bank-book",
                           "trial-balance",
                           "income-statement",
-                          "balance-sheet"
+                          "balance-sheet",
+                          "deal-profitability"
                         ]
                       },
                       "from": {
@@ -31984,6 +32598,12 @@
             "items": {
               "$ref": "#/components/schemas/DealerAllocation"
             }
+          },
+          "purchases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertyPurchase"
+            }
           }
         }
       },
@@ -33262,6 +33882,12 @@
             "items": {
               "$ref": "#/components/schemas/DealerAllocation"
             }
+          },
+          "purchases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertyPurchase"
+            }
           }
         }
       },
@@ -34282,6 +34908,27 @@
               }
             ]
           },
+          "unitId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dealerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expenseItems": {},
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -34295,6 +34942,26 @@
           },
           "vendor": {
             "$ref": "#/components/schemas/Vendor"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Unit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dealer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Dealer"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "journal": {
             "anyOf": [

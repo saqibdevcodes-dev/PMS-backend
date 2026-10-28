@@ -12,7 +12,7 @@ import { postJournal, reverseJournal, type PostingLine } from './service.js';
 import { unitState } from '../inventory/service.js';
 
 const expenseItemSchema = z.object({
-  id: z.string().default(() => crypto.randomUUID()),
+  id: z.string().optional(),
   name: z.string().trim().min(1).max(200),
   category: z.string().trim().default('Renovation & Building'),
   amount: positiveMoney,
@@ -77,7 +77,11 @@ async function validate(tx: Tx, ctx: Context, input: z.infer<typeof body>, curre
   if (input.dealerId) {
     found(await tx.dealer.findFirst({ where: { id: input.dealerId, projectId: ctx.projectId } }));
   }
-  const renovationExpenseSum = sum(input.expenseItems.map((item) => item.amount));
+  const expenseItems = input.expenseItems.map((item) => ({
+    ...item,
+    id: item.id || crypto.randomUUID(),
+  }));
+  const renovationExpenseSum = sum(expenseItems.map((item) => item.amount));
   const combinedOtherCosts = decimal(input.otherCosts).plus(renovationExpenseSum).toFixed(2);
   const total = sum([
     input.price,
@@ -94,6 +98,7 @@ async function validate(tx: Tx, ctx: Context, input: z.infer<typeof body>, curre
   );
   return {
     ...input,
+    expenseItems,
     otherCosts: combinedOtherCosts,
     purchaseDate: new Date(input.purchaseDate),
     total,
