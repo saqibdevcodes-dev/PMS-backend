@@ -21,10 +21,10 @@ The purchase price is credited to **Property seller payables** with the seller o
 
 Reserved accounts are created in the selected project on first posting:
 
-| Account code | Type | Purpose |
-| --- | --- | --- |
-| SYS-PROPERTY-INVENTORY | Asset | Acquisition cost held as property inventory |
-| SYS-SELLER-PAYABLES | Liability | Agreed property price owed to sellers |
+| Account code             | Type      | Purpose                                     |
+| ------------------------ | --------- | ------------------------------------------- |
+| SYS-PROPERTY-INVENTORY   | Asset     | Acquisition cost held as property inventory |
+| SYS-SELLER-PAYABLES      | Liability | Agreed property price owed to sellers       |
 | SYS-ACQUISITION-ACCRUALS | Liability | Additional direct acquisition costs payable |
 
 ## Next implementation stages

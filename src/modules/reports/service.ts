@@ -169,9 +169,7 @@ async function queryReport(
         const salePrice = booking ? booking.total : null;
         const netProfit = salePrice ? salePrice.minus(p.total) : null;
         const profitMargin =
-          salePrice && p.total.gt(0)
-            ? netProfit!.div(p.total).mul(100).toFixed(1)
-            : null;
+          salePrice && p.total.gt(0) ? netProfit!.div(p.total).mul(100).toFixed(1) : null;
         const collected = booking
           ? sum(booking.payments.map((pm) => pm.amount)).toFixed(2)
           : '0.00';
@@ -196,9 +194,7 @@ async function queryReport(
           unitNumber: p.unit?.number ?? '',
           unitType: p.unit?.type ?? '',
           unitPhase: p.unit?.phase ?? '',
-          unitSize: p.unit?.size
-            ? `${p.unit.size} ${p.unit.measurementUnit ?? ''}`.trim()
-            : '',
+          unitSize: p.unit?.size ? `${p.unit.size} ${p.unit.measurementUnit ?? ''}`.trim() : '',
           buyerName: booking?.customer?.name ?? '',
           buyerPhone: booking?.customer?.phone ?? '',
           bookingReference: booking?.reference ?? '',
@@ -660,22 +656,25 @@ export async function dealsProfitability(projectId: string) {
       const salePrice = booking ? booking.total : null;
       const netProfit = salePrice ? salePrice.minus(p.total) : null;
       const profitMarginPercent =
-        salePrice && p.total.gt(0)
-          ? netProfit!.div(p.total).mul(100).toFixed(1)
-          : null;
+        salePrice && p.total.gt(0) ? netProfit!.div(p.total).mul(100).toFixed(1) : null;
       const collectedAmount = booking
         ? sum(booking.payments.map((pm) => pm.amount)).toFixed(2)
         : '0.00';
 
       const items = Array.isArray(p.expenseItems)
-        ? (p.expenseItems as Array<{ id?: string; name: string; category?: string; amount: string | number }>).map(
-            (i) => ({
-              id: i.id ?? '',
-              name: i.name,
-              category: i.category ?? 'Renovation & Building',
-              amount: String(i.amount),
-            }),
-          )
+        ? (
+            p.expenseItems as Array<{
+              id?: string;
+              name: string;
+              category?: string;
+              amount: string | number;
+            }>
+          ).map((i) => ({
+            id: i.id ?? '',
+            name: i.name,
+            category: i.category ?? 'Renovation & Building',
+            amount: String(i.amount),
+          }))
         : [];
 
       return {

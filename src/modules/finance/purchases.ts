@@ -38,7 +38,9 @@ const body = z
   .strict();
 const include = {
   vendor: { select: { id: true, name: true, phone: true } },
-  unit: { select: { id: true, number: true, type: true, floor: true, size: true, measurementUnit: true } },
+  unit: {
+    select: { id: true, number: true, type: true, floor: true, size: true, measurementUnit: true },
+  },
   dealer: { select: { id: true, name: true, phone: true } },
   journal: { select: { id: true, reference: true } },
   reversal: { select: { id: true, reference: true } },
@@ -77,7 +79,13 @@ async function validate(tx: Tx, ctx: Context, input: z.infer<typeof body>, curre
   }
   const renovationExpenseSum = sum(input.expenseItems.map((item) => item.amount));
   const combinedOtherCosts = decimal(input.otherCosts).plus(renovationExpenseSum).toFixed(2);
-  const total = sum([input.price, input.taxes, input.legalFees, input.brokerage, combinedOtherCosts]);
+  const total = sum([
+    input.price,
+    input.taxes,
+    input.legalFees,
+    input.brokerage,
+    combinedOtherCosts,
+  ]);
   requireState(
     total.lt('10000000000000000'),
     'AMOUNT_TOO_LARGE',
@@ -381,7 +389,8 @@ export function purchaseRoutes(app: Express) {
     root + '/:id/list-for-sale',
     {
       permission: 'inventory.create',
-      summary: 'Move an investment-finalized property to active selling inventory with asking price',
+      summary:
+        'Move an investment-finalized property to active selling inventory with asking price',
       body: z.object({ askingPrice: positiveMoney }).strict(),
     },
     async (ctx, input, _q, req) =>

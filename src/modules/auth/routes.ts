@@ -238,7 +238,7 @@ export function authRoutes(app: Express) {
         select: { id: true, installationId: true, platform: true },
       }),
   );
-  
+
   endpoint(
     app,
     'delete',
