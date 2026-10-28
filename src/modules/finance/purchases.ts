@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import { z } from 'zod';
 import { DateTime } from 'luxon';
+import type { Unit } from '@prisma/client';
 import { db, transaction, lock, type Tx } from '../../database/client.js';
 import type { Context } from '../../common/context.js';
 import { endpoint, uuid, id, pageQuery, pagination, paged } from '../../common/http.js';
@@ -399,7 +400,7 @@ export function purchaseRoutes(app: Express) {
           422,
         );
 
-        let unit: any;
+        let unit: Unit;
         if (current.unitId) {
           unit = found(
             await tx.unit.findFirst({ where: { id: current.unitId, projectId: ctx.projectId } }),
