@@ -151,18 +151,16 @@ describe('light export layouts', () => {
   });
 
   it('keeps wide report fields in labeled column groups without dropping data', async () => {
-    const wide = rows
-      .slice(0, 3)
-      .map((row) => ({
-        ...row,
-        buyPrice: '1000000',
-        taxes: '10000',
-        legalFees: '2000',
-        brokerage: '5000',
-        totalCost: '1017000',
-        salePrice: '1500000',
-        netProfit: '483000',
-      }));
+    const wide = rows.slice(0, 3).map((row) => ({
+      ...row,
+      buyPrice: '1000000',
+      taxes: '10000',
+      legalFees: '2000',
+      brokerage: '5000',
+      totalCost: '1017000',
+      salePrice: '1500000',
+      netProfit: '483000',
+    }));
     const bytes = await pdfBuffer('Property profitability report', wide, branding, metadata);
     await writeFile(`${directory}/wide-report.pdf`, bytes);
     const text = pdfText(bytes);

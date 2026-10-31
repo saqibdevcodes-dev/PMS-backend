@@ -13,6 +13,7 @@ export default defineConfig({
       'tests/local-storage.test.ts',
       'tests/project-branding.test.ts',
       'tests/export-layout.test.ts',
+      'tests/dependency-compatibility.test.ts',
       'tests/email.test.ts',
     ],
     testTimeout: 20000,

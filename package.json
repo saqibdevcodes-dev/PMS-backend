@@ -78,6 +78,11 @@
     "vitest": "^5.0.1"
   },
   "overrides": {
+    "minimatch": "11.0.2",
+    "glob": "14.0.3",
+    "fstream": {
+      "rimraf": "2.2.8"
+    },
     "deepmerge-ts": "8.0.2",
     "mysql2": "3.24.4",
     "exceljs": {

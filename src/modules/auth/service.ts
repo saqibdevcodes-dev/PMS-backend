@@ -11,7 +11,10 @@ import { emailUser, passwordChangedEmail, webLink } from '../../common/notificat
 
 export const passwordHash = (password: string) =>
   argon2.hash(password, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 });
-export async function verifyUserPassword(userId: string, passwordAttempt: string): Promise<boolean> {
+export async function verifyUserPassword(
+  userId: string,
+  passwordAttempt: string,
+): Promise<boolean> {
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user || !user.active) return false;
   return argon2.verify(user.passwordHash, passwordAttempt).catch(() => false);

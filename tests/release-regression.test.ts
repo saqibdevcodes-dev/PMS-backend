@@ -406,7 +406,8 @@ it('guards against accepting arbitrary text with a docx extension as a valid Wor
 });
 it('summarizes more than 1000 installments and pages every selected-day obligation', async () => {
   const f = await booking('DRAFT');
-  const day = new Date().toISOString().slice(0, 10);
+  // Other cases create installments due today. Keep this volume fixture on its own date.
+  const day = '2099-08-15';
   await db.installment.updateMany({
     where: { bookingId: f.booking.id },
     data: { superseded: true },
