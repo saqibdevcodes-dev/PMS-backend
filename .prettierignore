@@ -1,6 +1,7 @@
 node_modules
 dist
 uploads/
+.deploy/
 package-lock.json
 docs/openapi.json
 prisma/migrations

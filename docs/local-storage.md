@@ -8,7 +8,9 @@ When running directly with Node, `UPLOAD_DIR=uploads` is relative to the backend
 
 ## Existing VPS deployment
 
-After committing these changes, pushing them and pulling the new backend code onto the VPS, edit `/var/www/PMS-BE/.env`. Keep the existing database, login, encryption and other settings. Add or update:
+Routine production releases use the [backend pipeline](deployment.md#production-pipeline). The commands below are references for storage setup or a planned storage migration. The active production Compose project is `pms`.
+
+For storage configuration, edit `/var/www/PMS-BE/.env`. Keep the existing database, login, encryption and other settings. Add or update:
 
 ```dotenv
 STORAGE_DRIVER=local
@@ -18,19 +20,19 @@ PUBLIC_API_URL=https://api.etihadrealestate.tech
 
 Replace the API domain above if necessary. Compose overrides `UPLOAD_DIR` to `/app/uploads` inside its containers.
 
-Prepare the host directory for the container's `node` user (UID/GID 1000). Use the existing `pms-be` Compose project to reuse the running database and Redis:
+Prepare the host directory for the container's `node` user (UID/GID 1000). Use the existing `pms` Compose project to reuse the running database and Redis:
 
 ```bash
 cd /var/www/PMS-BE
 install -d -o 1000 -g 1000 -m 750 uploads
-docker compose -p pms-be --profile app build api worker
-docker compose -p pms-be --profile app stop api worker
+docker compose -p pms --profile app build api worker
+docker compose -p pms --profile app stop api worker
 ```
 
 If there are existing images/documents in the running MinIO service, import them **before restarting the application**. Keep the old S3 settings in `.env` for this command and keep the existing storage container running:
 
 ```bash
-docker compose -p pms-be --profile app run --rm --no-deps api npm run storage:import-s3
+docker compose -p pms --profile app run --rm --no-deps api npm run storage:import-s3
 ```
 
 The importer copies every object into the same relative key under `uploads/`; database references remain valid. It leaves the source bucket intact. Run it while API and worker are stopped; repeating it replaces local files with the source versions. If the import fails, leave the source storage intact, resolve the error and rerun it before switching the application. Skip this step when there are no existing files.
@@ -38,13 +40,13 @@ The importer copies every object into the same relative key under `uploads/`; da
 Apply migrations and start the new release:
 
 ```bash
-docker compose -p pms-be --profile app run --rm --no-deps api npm run db:migrate
-docker compose -p pms-be --profile app up -d --no-deps --force-recreate api worker
-docker compose -p pms-be --profile app ps
+docker compose -p pms --profile app run --rm --no-deps api npm run db:migrate
+docker compose -p pms --profile app up -d --no-deps --force-recreate api worker
+docker compose -p pms --profile app ps
 curl --fail http://127.0.0.1:4000/health/ready
 ```
 
-Upload an image in the dashboard and confirm that it displays. Check an existing image/document if you imported old files. If needed, inspect `docker compose -p pms-be logs --tail=100 api worker`.
+Upload an image in the dashboard and confirm that it displays. Check an existing image/document if you imported old files. If needed, inspect `docker compose -p pms logs --tail=100 api worker`.
 
 No Nginx static directory is needed; the API serves `/api/v1/files?token=...` through the existing API proxy. The frontend Nginx Content Security Policy must allow the backend origin for images. Its `img-src` directive should include:
 

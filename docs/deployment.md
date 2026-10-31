@@ -1,5 +1,34 @@
 # Deployment and operations
 
+## Production pipeline
+
+The backend repository's `.github/workflows/ci.yml` runs three dependent stages:
+
+1. **Validate and test**: clean dependency installation, isolated infrastructure, migrations, type checking, lint, formatting, unit tests, full database/workflow tests, S3 integration tests, generated OpenAPI comparison, dependency audit and deployment regression checks.
+2. **Build release image**: build the checked-out revision, require the compiled calendar module, smoke test the actual API/worker image against isolated services, and publish a checksummed artifact containing the Docker image, API contract and activation/verification scripts.
+3. **Deploy and verify production**: for `main` pushes or a manual run on `main`, upload that artifact over SSH, activate it in the existing `pms` Compose project, and verify the public API from both the VPS and GitHub runner. Pull requests targeting `main` validate and build without deploying. A superseded revision of `main` cannot begin deployment.
+
+In the **backend GitHub repository**, create the `production` environment and configure these secrets there (or as repository secrets accessible to this environment):
+
+| Secret            | Value                                                                        |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `VPS_HOST`        | Production VPS IP address or SSH hostname                                    |
+| `VPS_USER`        | Existing deployment account                                                  |
+| `VPS_SSH_KEY`     | Private SSH key authorized for that account                                  |
+| `VPS_KNOWN_HOSTS` | Trusted SSH host-key entry for that VPS, including the port when nonstandard |
+
+The optional environment/repository variable `VPS_PORT` defaults to `22`. Frontend repository secrets are not automatically available to the backend repository. Restrict the production environment to the `main` branch. Existing environment approval rules still apply.
+
+The deployment account needs Docker access and write access to `/var/www/PMS-BE/.deploy`. The VPS needs Bash, `rsync`, `flock`, and Docker Compose with `--wait` support. The current `/var/www/PMS-BE/.env`, `compose.yaml`, `uploads/`, and running `pms` PostgreSQL, Redis, mail, API and worker services must already exist. Deployment fails before stopping the application when those prerequisites or database/Redis health checks fail. It does not create another infrastructure stack or change Nginx.
+
+The pipeline loads the image built by GitHub and supplies its immutable revision tag through a Compose override. It preserves the existing Compose configuration, environment, upload bind mount and database volumes. The host's old source checkout is no longer a deployment input; it need not contain newly added source files. Do not rebuild that old checkout to release changes. The compiled code in the deployed image comes from the checked-out pipeline revision.
+
+Before stopping API/worker, activation creates a private PostgreSQL backup under `.deploy/releases/<revision>-<run>-<attempt>/database-before.dump`. It then runs `prisma migrate deploy` from the new image and recreates only API/worker, without rebuilding or pulling images. Both containers must run the expected image. `/health/live` must report the exact revision, readiness must succeed, the public OpenAPI contract must equal the release artifact, and both calendar endpoints must reject anonymous requests with HTTP 401 rather than endpoint-not-found. A reachable OpenAPI URL alone does not count as successful deployment.
+
+Activation failures after stopping the application attempt to restore both previous application images and still fail the workflow. Database migrations are **not** reversed automatically; keep migrations compatible with the previous release. Backups and release images remain on the VPS for recovery; manage their retention and disk space. Never publish `.deploy` or its backups as static files or GitHub artifacts.
+
+Successful deployment records `.deploy/current-revision` and `.deploy/current-compose.yaml`. Production deployments are serialized. No manual source upload or server-side repository update is part of the release process.
+
 ## Runtime and secrets
 
 Build from the committed lockfile with `npm ci`. The Docker image targets Node.js 24 LTS. Run API and worker as separate processes from the same release. Apply `prisma migrate deploy` as a release step before starting them; do not run interactive migrations against production.

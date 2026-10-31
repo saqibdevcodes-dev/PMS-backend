@@ -22,13 +22,6 @@ The running API contract at `http://localhost:4000/api/v1/openapi.json` must inc
 
 ## VPS update
 
-Deploy the backend and database migration before deploying the new frontend. From `/var/www/PMS-BE`, after pulling the changes:
-
-```sh
-docker compose -p pms-be --profile app build api worker &&
-docker compose -p pms-be --profile app stop api worker &&
-docker compose -p pms-be --profile app run --rm --no-deps api npm run db:migrate &&
-docker compose -p pms-be --profile app up -d --no-deps --force-recreate api worker
-```
+Deploy the backend and database migration through the [backend production pipeline](deployment.md#production-pipeline) before deploying the new frontend. The workflow deploys the validated image to the existing `pms` project.
 
 Then run the usual frontend deployment. Existing database and upload volumes must remain in place.

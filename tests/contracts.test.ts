@@ -1,4 +1,5 @@
-import { afterAll, describe, it, expect } from 'vitest';
+import { afterAll, describe, it, expect, vi } from 'vitest';
+import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { routeDocs } from '../src/common/http.js';
 import { buildOpenApi } from '../src/docs/openapi.js';
@@ -6,7 +7,7 @@ import { db } from '../src/database/client.js';
 import { redis } from '../src/integrations/redis.js';
 import { storage } from '../src/integrations/storage.js';
 
-createApp();
+const app = createApp();
 const spec = buildOpenApi();
 
 afterAll(async () => {
@@ -16,6 +17,16 @@ afterAll(async () => {
 });
 
 describe('generated API contract', () => {
+  it('exposes the built revision for production deployment verification', async () => {
+    const revision = 'a'.repeat(40);
+    vi.stubEnv('RELEASE_REVISION', revision);
+    try {
+      const response = await request(app).get('/health/live').expect(200);
+      expect(response.body).toEqual({ status: 'ok', revision });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it('preserves model list cardinality and enum choices', () => {
     expect(spec.components.schemas.User).toMatchObject({
       properties: { projects: { type: 'array' }, roles: { type: 'array' } },

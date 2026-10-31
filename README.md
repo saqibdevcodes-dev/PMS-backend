@@ -87,12 +87,4 @@ npm audit
 
 External SMS and push services use configurable authenticated HTTP adapters; email uses SMTP. Provider credentials are required for external delivery. The optional malware scanner uses an HTTP scan adapter. The backend reports provider failures and retries them; it does not fabricate delivery success.
 
-docker compose -p pms-be --profile app build api worker &&
-docker compose -p pms-be --profile app stop api worker &&
-docker compose -p pms-be --profile app run --rm --no-deps api npm run db:migrate &&
-docker compose -p pms-be --profile app up -d --no-deps --force-recreate api worker
-
-docker exec \
--e ADMIN_EMAIL='email' \
--e ADMIN_PASSWORD='Password' \
-pms-be-api-1 node /app/dist/prisma/seed.js
+Production releases run through the backend GitHub Actions workflow on `main`: validate and test, build a revision-tagged Docker image, then deploy and verify that exact image in the existing `pms` project. Configure the backend repository's production SSH secrets as described in [production pipeline setup](docs/deployment.md#production-pipeline). The workflow preserves production configuration, uploads and database volumes; it does not run seed scripts.

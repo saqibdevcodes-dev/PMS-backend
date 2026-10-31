@@ -94,7 +94,9 @@ export function createApp() {
   );
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
-  app.get('/health/live', (_req, res) => res.json({ status: 'ok' }));
+  app.get('/health/live', (_req, res) =>
+    res.json({ status: 'ok', revision: process.env.RELEASE_REVISION ?? 'development' }),
+  );
   app.get('/health/ready', async (_req, res) => {
     try {
       await Promise.all([db.$queryRaw`SELECT 1`, redis.ping(), checkStorage()]);

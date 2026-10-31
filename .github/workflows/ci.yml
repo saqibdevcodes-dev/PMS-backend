@@ -1,33 +1,179 @@
-name: Backend validation
+name: Backend CI/CD
+
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   validate:
+    name: 1. Validate and test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - run: npm run setup:env
-      - run: docker compose up -d postgres redis storage mail --wait
-      - run: npm run db:generate
-      - run: npm run db:migrate
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run test:unit
-      - run: npm test
-      - run: npm run test:integration
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Prepare isolated test services
+        run: |
+          npm run setup:env
+          docker compose --profile s3 up -d --wait postgres redis storage mail
+          npm run db:generate
+          npm run db:migrate
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format:check
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Database and workflow tests
+        run: npm test
+      - name: S3 integration tests
+        run: npm run test:integration
         env:
           STORAGE_DRIVER: s3
-      - run: npm run build
-      - run: npm run openapi
-      - run: git diff --exit-code docs/openapi.json
-      - run: npm audit --audit-level=moderate
-      - if: always()
+      - name: Build and verify generated API contract
+        run: |
+          cp docs/openapi.json "$RUNNER_TEMP/expected-openapi.json"
+          npm run openapi
+          cmp "$RUNNER_TEMP/expected-openapi.json" docs/openapi.json
+      - name: Dependency security audit
+        run: npm audit --audit-level=moderate
+      - name: Validate deployment scripts
+        run: |
+          bash -n deployment/activate-release.sh
+          node --test deployment/verify-release.checks.mjs
+          bash deployment/activate-release.test.sh
+      - name: Remove runner test services
+        if: always()
         run: docker compose --profile s3 down -v
+
+  build:
+    name: 2. Build release image
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build the validated revision
+        run: |
+          docker build --build-arg "RELEASE_REVISION=$GITHUB_SHA" --tag "pms-backend:$GITHUB_SHA" .
+          docker run --rm --entrypoint node "pms-backend:$GITHUB_SHA" -e \
+            "require('node:fs').accessSync('dist/src/modules/reports/calendar.js')"
+      - name: Smoke test the release image against isolated services
+        run: |
+          node scripts/setup-env.mjs
+          sudo install -d -o 1000 -g 1000 -m 750 uploads
+          printf 'services:\n  api:\n    image: pms-backend:%s\n  worker:\n    image: pms-backend:%s\n' \
+            "$GITHUB_SHA" "$GITHUB_SHA" > "$RUNNER_TEMP/compose.release.yaml"
+          docker compose up -d --wait postgres redis mail
+          compose=(docker compose -f compose.yaml -f "$RUNNER_TEMP/compose.release.yaml" --profile app)
+          "${compose[@]}" run --rm --no-deps --pull never api npm run db:migrate
+          "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout 180 api worker
+          node deployment/verify-release.mjs "$GITHUB_SHA" docs/openapi.json http://127.0.0.1:4000
+      - name: Package deployment artifact
+        run: |
+          mkdir release
+          docker save "pms-backend:$GITHUB_SHA" | gzip > release/backend-image.tar.gz
+          cp docs/openapi.json release/openapi.json
+          cp deployment/activate-release.sh deployment/verify-release.mjs release/
+          cd release
+          sha256sum backend-image.tar.gz openapi.json activate-release.sh verify-release.mjs > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-release-${{ github.sha }}
+          path: release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Remove runner image-test services
+        if: always()
+        run: |
+          if [[ -f .env ]]; then
+            docker compose --profile app down -v
+          fi
+
+  deploy:
+    name: 3. Deploy and verify production
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://api.etihadrealestate.tech
+    concurrency:
+      group: backend-production
+      cancel-in-progress: false
+    steps:
+      - name: Refuse a superseded main revision
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
+            if (data.commit.sha !== context.sha) {
+              core.setFailed('A newer commit is on main. Deploy the workflow for the current main revision.');
+            }
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-release-${{ github.sha }}
+          path: release/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Configure production SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_KEY" || { echo 'Missing production secret VPS_SSH_KEY'; exit 1; }
+          test -n "$KNOWN_HOSTS" || { echo 'Missing production secret VPS_KNOWN_HOSTS'; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Deploy the built artifact to the existing pms project
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ vars.VPS_PORT || '22' }}
+        run: |
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$VPS_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]]
+          target="$VPS_USER@$VPS_HOST"
+          release="/var/www/PMS-BE/.deploy/releases/$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh_options=(-p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+          ssh "${ssh_options[@]}" "$target" "umask 077; mkdir -p '$release'"
+          export RSYNC_RSH="ssh -p $VPS_PORT -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15"
+          rsync -az --chmod=D700,F600 release/ "$target:$release/"
+          ssh "${ssh_options[@]}" "$target" \
+            "bash '$release/activate-release.sh' '$GITHUB_SHA' '$release'"
+      - name: Verify public revision and API contract from GitHub
+        run: node release/verify-release.mjs "$GITHUB_SHA" release/openapi.json
+      - name: Deployment result
+        run: |
+          echo "### Backend production deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed and verified revision: \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Compose project: `pms`; API and worker use the same release image.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove runner SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
