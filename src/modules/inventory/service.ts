@@ -1,11 +1,20 @@
 import { UnitStatus } from '@prisma/client';
 import { lock, type Tx } from '../../database/client.js';
 import type { Context } from '../../common/context.js';
-import { found } from '../../common/errors.js';
+import { found, requireState } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
 export async function scopedUnit(tx: Tx, ctx: Context, id: string) {
   await lock(tx, 'Unit', id);
   return found(await tx.unit.findFirst({ where: { id, projectId: ctx.projectId } }));
+}
+// Every alternate inventory workflow must use the same ownership boundary.
+export async function requireUncommittedUnit(tx: Tx, unit: { id: string; status: UnitStatus }) {
+  requireState(
+    ['AVAILABLE', 'BLOCKED'].includes(unit.status) &&
+      !(await tx.booking.count({ where: { unitId: unit.id, status: { not: 'CANCELLED' } } })),
+    'UNIT_ALREADY_COMMITTED',
+    'This property has an active booking, transfer or possession and cannot be relisted or reversed.',
+  );
 }
 export async function unitState(
   tx: Tx,

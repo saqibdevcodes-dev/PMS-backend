@@ -7,6 +7,7 @@ import { decimal, sum } from '../../common/money.js';
 import { found, requireState } from '../../common/errors.js';
 import { json, outbox, audit } from '../../common/operations.js';
 import { redis } from '../../integrations/redis.js';
+import { dealPosition, dealStage } from './profitability.js';
 import { customerStatementReport } from './customer-statement.js';
 export const reportKinds = [
   'sales',
@@ -166,10 +167,9 @@ async function queryReport(
       return purchases.map((p) => {
         const booking = p.unit?.bookings?.[0];
         const extraExpenses = p.total.minus(p.price);
-        const salePrice = booking ? booking.total : null;
-        const netProfit = salePrice ? salePrice.minus(p.total) : null;
+        const { salePrice, netProfit, projectedProfit } = dealPosition(p.total, booking);
         const profitMargin =
-          salePrice && p.total.gt(0) ? netProfit!.div(p.total).mul(100).toFixed(1) : null;
+          netProfit && p.total.gt(0) ? netProfit.div(p.total).mul(100).toFixed(1) : null;
         const collected = booking
           ? sum(booking.payments.map((pm) => pm.amount)).toFixed(2)
           : '0.00';
@@ -202,14 +202,9 @@ async function queryReport(
           salePrice: salePrice ? salePrice.toFixed(2) : '',
           collectedAmount: collected,
           netProfit: netProfit ? netProfit.toFixed(2) : '',
+          projectedProfit: projectedProfit?.toFixed(2) ?? '',
           profitMarginPercent: profitMargin ? `${profitMargin}%` : '',
-          dealStatus: booking
-            ? booking.status === 'CONFIRMED'
-              ? 'SOLD'
-              : 'BOOKED'
-            : p.status === 'POSTED'
-              ? 'AVAILABLE'
-              : 'DRAFT',
+          dealStatus: dealStage(p.status, p.unit?.status, booking?.status),
         };
       });
     }
@@ -580,14 +575,16 @@ export async function report(projectId: string, q: ReportQuery, limit = 1000) {
     const totalCost = sum(rows.map((r) => String(r.totalCost || 0)));
     const soldRows = rows.filter((r) => Boolean(r.salePrice));
     const totalSales = sum(soldRows.map((r) => String(r.salePrice)));
-    const soldCost = sum(soldRows.map((r) => String(r.totalCost)));
-    const netProfit = totalSales.minus(soldCost);
+    const soldCost = sum(
+      soldRows.filter((r) => r.netProfit !== null).map((r) => String(r.totalCost)),
+    );
+    const netProfit = sum(soldRows.map((r) => String(r.netProfit || '0')));
     const avgMargin = soldCost.gt(0) ? netProfit.div(soldCost).mul(100).toFixed(1) : '0.0';
 
     Object.assign(summary, {
       totalDeals: rows.length,
       soldCount: soldRows.length,
-      availableCount: rows.length - soldRows.length,
+      availableCount: rows.filter((r) => r.dealStatus === 'AVAILABLE').length,
       totalBuyPrice: totalBuy.toFixed(2),
       totalExpenses: totalExp.toFixed(2),
       totalInvestedCost: totalCost.toFixed(2),
@@ -653,10 +650,9 @@ export async function dealsProfitability(projectId: string) {
     const deals = purchases.map((p) => {
       const booking = p.unit?.bookings?.[0];
       const extraExpenses = p.total.minus(p.price);
-      const salePrice = booking ? booking.total : null;
-      const netProfit = salePrice ? salePrice.minus(p.total) : null;
+      const { salePrice, netProfit, projectedProfit } = dealPosition(p.total, booking);
       const profitMarginPercent =
-        salePrice && p.total.gt(0) ? netProfit!.div(p.total).mul(100).toFixed(1) : null;
+        netProfit && p.total.gt(0) ? netProfit.div(p.total).mul(100).toFixed(1) : null;
       const collectedAmount = booking
         ? sum(booking.payments.map((pm) => pm.amount)).toFixed(2)
         : '0.00';
@@ -685,6 +681,8 @@ export async function dealsProfitability(projectId: string) {
         location: p.location,
         purchaseDate: p.purchaseDate.toISOString().slice(0, 10),
         status: p.status,
+        notes: p.notes,
+        dealerId: p.dealerId,
         seller: {
           id: p.vendor?.id ?? '',
           name: p.vendor?.name ?? '—',
@@ -725,14 +723,9 @@ export async function dealsProfitability(projectId: string) {
         salePrice: salePrice ? salePrice.toFixed(2) : null,
         collected: collectedAmount,
         netProfit: netProfit ? netProfit.toFixed(2) : null,
+        projectedProfit: projectedProfit?.toFixed(2) ?? null,
         profitMarginPercent: profitMarginPercent ? `${profitMarginPercent}%` : null,
-        dealStatus: (booking
-          ? booking.status === 'CONFIRMED'
-            ? 'SOLD'
-            : 'BOOKED'
-          : p.status === 'POSTED'
-            ? 'AVAILABLE'
-            : 'DRAFT') as 'SOLD' | 'BOOKED' | 'AVAILABLE' | 'DRAFT',
+        dealStatus: dealStage(p.status, p.unit?.status, booking?.status),
       };
     });
 
@@ -741,8 +734,8 @@ export async function dealsProfitability(projectId: string) {
     const totalCost = sum(deals.map((d) => d.totalCost));
     const soldDeals = deals.filter((d) => d.salePrice !== null);
     const totalSales = sum(soldDeals.map((d) => d.salePrice!));
-    const soldCost = sum(soldDeals.map((d) => d.totalCost));
-    const totalProfit = totalSales.minus(soldCost);
+    const soldCost = sum(soldDeals.filter((d) => d.netProfit !== null).map((d) => d.totalCost));
+    const totalProfit = sum(soldDeals.map((d) => d.netProfit ?? '0'));
     const avgMargin = soldCost.gt(0) ? totalProfit.div(soldCost).mul(100).toFixed(1) : '0.0';
 
     return {
@@ -750,7 +743,7 @@ export async function dealsProfitability(projectId: string) {
       summary: {
         totalAcquisitions: deals.length,
         soldCount: soldDeals.length,
-        availableCount: deals.length - soldDeals.length,
+        availableCount: deals.filter((d) => d.dealStatus === 'AVAILABLE').length,
         totalBuyPrice: totalBuy.toFixed(2),
         totalExpenses: totalExp.toFixed(2),
         totalInvestedCost: totalCost.toFixed(2),

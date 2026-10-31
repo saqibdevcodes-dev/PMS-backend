@@ -4,7 +4,7 @@ import { found } from '../common/errors.js';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-export type DocumentBranding = { name: string; logo?: Buffer | string };
+export type DocumentBranding = { name: string; logo?: Buffer | string; timezone?: string };
 
 // Call only after authorising access to the project/document. Missing project artwork
 // falls back to its name, not to another project's logo.
@@ -12,24 +12,32 @@ export async function projectBranding(projectId: string): Promise<DocumentBrandi
   const project = found(
     await db.project.findUnique({
       where: { id: projectId },
-      select: { name: true, logo: { select: { key: true, purpose: true, mime: true } } },
+      select: {
+        name: true,
+        timezone: true,
+        logo: { select: { key: true, purpose: true, mime: true } },
+      },
     }),
   );
+  const identity = {
+    name: project.name,
+    ...(project.timezone ? { timezone: project.timezone } : {}),
+  };
   if (project.logo) {
     if (
       project.logo.purpose === 'PROJECT_LOGO' &&
       ['image/png', 'image/jpeg'].includes(project.logo.mime)
     ) {
       try {
-        return { name: project.name, logo: await readObject(project.logo.key) };
+        return { ...identity, logo: await readObject(project.logo.key) };
       } catch {
-        return { name: project.name };
+        return identity;
       }
     }
-    return { name: project.name };
+    return identity;
   }
   const fallback = resolve('assets/statement-logo.png');
-  return { name: project.name, ...(existsSync(fallback) ? { logo: fallback } : {}) };
+  return { ...identity, ...(existsSync(fallback) ? { logo: fallback } : {}) };
 }
 
 export function drawDocumentBrand(

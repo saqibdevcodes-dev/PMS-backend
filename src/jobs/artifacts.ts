@@ -1,47 +1,15 @@
-import PDFDocument from 'pdfkit';
-import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { db, transaction, lock } from '../database/client.js';
-import { report, reportQuery, type ReportRow } from '../modules/reports/service.js';
+import { report, reportQuery } from '../modules/reports/service.js';
 import { putObject } from '../integrations/storage.js';
 import { found, requireState } from '../common/errors.js';
 import { emailUser, webLink } from '../common/notifications.js';
 import { statementPdf } from './statement-pdf.js';
-import { projectBranding, drawDocumentBrand, type DocumentBranding } from './project-branding.js';
-export function pdfBuffer(
-  title: string,
-  rows: ReportRow[] | string,
-  branding?: DocumentBranding,
-): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 42, info: { Title: title } });
-    const chunks: Buffer[] = [];
-    doc.on('data', (b: Buffer) => chunks.push(b));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-    if (branding) {
-      drawDocumentBrand(doc, branding, 42, 42);
-      doc
-        .font('Helvetica')
-        .fontSize(10)
-        .text(branding.name, 220, 42, { width: 290, align: 'right' });
-      doc.y = 110;
-      doc.x = 42;
-    }
-    doc.font('Helvetica-Bold').fontSize(18).fillColor('#203249').text(title);
-    doc.moveDown();
-    doc.fontSize(10);
-    if (typeof rows === 'string') doc.text(rows);
-    else
-      for (const [index, row] of rows.entries()) {
-        doc.fontSize(10).text(String(index + 1), { continued: false });
-        for (const [key, value] of Object.entries(row))
-          doc.fontSize(8).text(`${key}: ${String(value ?? '')}`);
-        doc.moveDown();
-      }
-    doc.end();
-  });
-}
+import { projectBranding } from './project-branding.js';
+import { pdfBuffer } from './report-pdf.js';
+import { reportWorkbook } from './report-xlsx.js';
+import { exportLabel } from './export-format.js';
+export { pdfBuffer } from './report-pdf.js';
 export async function generateArtifact(jobId: string) {
   const job = found(await db.backgroundJob.findUnique({ where: { id: jobId } }));
   if (job.status === 'COMPLETED') return;
@@ -104,21 +72,28 @@ export async function generateArtifact(jobId: string) {
       const result = await report(job.projectId, input.report, 50000);
       extension = input.format;
       if (input.format === 'xlsx') {
-        const workbook = new ExcelJS.Workbook();
-        workbook.creator = 'PMS';
-        const sheet = workbook.addWorksheet('Report');
-        const columns = [...new Set(result.rows.flatMap((r) => Object.keys(r)))];
-        sheet.columns = columns.map((key) => ({ header: key, key, width: 24 }));
-        for (const row of result.rows) sheet.addRow(row);
-        sheet.getRow(1).font = { bold: true };
-        sheet.views = [{ state: 'frozen', ySplit: 1 }];
+        const workbook = reportWorkbook({
+          title: exportLabel(input.report.kind) + ' report',
+          projectName: branding.name,
+          currency: result.currency,
+          timezone: branding.timezone,
+          generatedAt: new Date().toISOString(),
+          rows: result.rows,
+          summary: result.summary,
+          filters: input.report,
+          ...('statement' in result && result.statement ? { statement: result.statement } : {}),
+        });
         body = Buffer.from(await workbook.xlsx.writeBuffer());
         mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       } else {
         body =
           'statement' in result && result.statement
             ? await statementPdf(result.statement, branding)
-            : await pdfBuffer(input.report.kind + ' report', result.rows, branding);
+            : await pdfBuffer(exportLabel(input.report.kind) + ' report', result.rows, branding, {
+                currency: result.currency,
+                timezone: branding.timezone,
+                filters: input.report,
+              });
         mime = 'application/pdf';
       }
     } else {

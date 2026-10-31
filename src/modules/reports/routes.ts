@@ -5,8 +5,10 @@ import { endpoint, id } from '../../common/http.js';
 import { found, requireState } from '../../common/errors.js';
 import { dashboard, report, reportQuery, queueExport, dealsProfitability } from './service.js';
 import { signedDownload } from '../../integrations/storage.js';
+import { calendarRoutes } from './calendar.js';
 const root = '/projects/:projectId';
 export function reportRoutes(app: Express) {
+  calendarRoutes(app);
   endpoint(
     app,
     'get',

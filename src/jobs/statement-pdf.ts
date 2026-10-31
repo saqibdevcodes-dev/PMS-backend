@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { drawDocumentBrand, type DocumentBranding } from './project-branding.js';
 import { DateTime } from 'luxon';
+import { exportAmountWords } from './export-format.js';
 import {
   type AccountStatement,
   type StatementColumn,
@@ -70,6 +71,7 @@ export function statementPdf(
           .stroke();
       const newPage = () => {
         doc.addPage();
+        doc.rect(0, 0, doc.page.width, doc.page.height).fill('#ffffff');
         text(branding?.name ?? 'ETIHAD REAL ESTATE', left, 32, width / 2, 9, true, blue);
         text('ACCOUNT STATEMENT', left + width / 2, 32, width / 2, 8, false, muted, 'right');
         rule(53);
@@ -140,21 +142,28 @@ export function statementPdf(
       text(customerLines, left + 16, y + 32, width * 0.55 - 30, 10);
       text(detail, left + width * 0.55, y + 20, width * 0.45 - 16, 9, false, muted);
       y += detailsHeight + 22;
-      ensure(90);
       const gap = 10,
         cardWidth = (width - gap * 2) / 3;
+      const metricHeight = Math.max(
+        108,
+        ...statement.metrics
+          .slice(0, 3)
+          .map(
+            (metric) =>
+              height(
+                exportAmountWords(metric.amount, statement.project.currency),
+                cardWidth - 24,
+                7.2,
+              ) + 88,
+          ),
+      );
+      ensure(metricHeight + 16);
       statement.metrics.slice(0, 3).forEach((metric, index) => {
         const x = left + index * (cardWidth + gap);
-        doc.roundedRect(x, y, cardWidth, 78, 6).fill(metric.emphasis ? blue : '#eef3f8');
-        text(
-          metric.label.toUpperCase(),
-          x + 12,
-          y + 13,
-          cardWidth - 24,
-          7.2,
-          true,
-          metric.emphasis ? '#dce8f3' : muted,
-        );
+        doc
+          .roundedRect(x, y, cardWidth, metricHeight, 6)
+          .fill(metric.emphasis ? '#e5eef7' : '#f5f7fa');
+        text(metric.label.toUpperCase(), x + 12, y + 13, cardWidth - 24, 7.2, true, muted);
         const value = statementValue(
           metric.amount,
           { key: '', label: '', type: 'money', width: 0 },
@@ -166,18 +175,19 @@ export function statementPdf(
           doc.font('Helvetica-Bold').fontSize(size).widthOfString(value) > cardWidth - 24
         )
           size--;
-        text(value, x + 12, y + 31, cardWidth - 24, size, true, metric.emphasis ? '#ffffff' : ink);
+        text(value, x + 12, y + 31, cardWidth - 24, size, true, metric.emphasis ? blue : ink);
+        text(statement.project.currency, x + 12, y + 58, cardWidth - 24, 7.5, false, muted);
         text(
-          statement.project.currency,
+          exportAmountWords(metric.amount, statement.project.currency),
           x + 12,
-          y + 58,
+          y + 75,
           cardWidth - 24,
-          7.5,
+          7.2,
           false,
-          metric.emphasis ? '#dce8f3' : muted,
+          muted,
         );
       });
-      y += 98;
+      y += metricHeight + 20;
       for (const value of statement.notes) note(value);
       y += 9;
 
@@ -186,13 +196,19 @@ export function statementPdf(
         const columnWidth = (column: StatementColumn) => column.width * unit;
         const headingHeight = height(section.description, width, 8.5);
         ensure(90 + headingHeight);
+        const tableHeaderHeight = Math.max(
+          29,
+          ...section.columns.map(
+            (column) => height(column.label, columnWidth(column) - 16, 7.5, true) + 18,
+          ),
+        );
         const heading = (continued = false) => {
           text(section.title + (continued ? ' (continued)' : ''), left, y, width, 13, true);
           y += 23;
           if (!continued) {
             y = text(section.description, left, y, width, 8.5, false, muted) + 12;
           }
-          doc.rect(left, y, width, 29).fill('#eaf0f6');
+          doc.rect(left, y, width, tableHeaderHeight).fill('#eaf0f6');
           let x = left;
           for (const col of section.columns) {
             text(
@@ -207,7 +223,7 @@ export function statementPdf(
             );
             x += columnWidth(col);
           }
-          y += 29;
+          y += tableHeaderHeight;
         };
         heading();
         if (!section.rows.length) {
@@ -215,7 +231,12 @@ export function statementPdf(
           y += 43;
         }
         for (const [index, row] of section.rows.entries()) {
-          const values = section.columns.map((col) => statementValue(row[col.key], col, statement));
+          const values = section.columns.map((col) => {
+            const value = statementValue(row[col.key], col, statement);
+            return col.type === 'money' && value !== '-'
+              ? `${value}\n${exportAmountWords(row[col.key], statement.project.currency)}`
+              : value;
+          });
           const rowHeight = Math.max(
             34,
             ...values.map((v, i) => height(v, columnWidth(section.columns[i]!) - 16, 8) + 18),

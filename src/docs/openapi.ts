@@ -75,7 +75,7 @@ export function buildOpenApi() {
         name: match[1],
         in: 'path',
         required: true,
-        schema: { type: 'string', format: 'uuid' },
+        schema: { type: 'string', ...(/Id$|^id$/.test(match[1]!) ? { format: 'uuid' } : {}) },
       });
     if (route.query) {
       const query = z.toJSONSchema(route.query, { io: 'input', unrepresentable: 'any' }) as {

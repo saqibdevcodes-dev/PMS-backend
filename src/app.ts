@@ -135,6 +135,7 @@ export function createApp() {
       minimumClientVersion: env.MIN_CLIENT_VERSION,
       platforms: ['web', 'electron', 'android', 'ios'],
       onlineRequired: true,
+      publicWebUrl: env.PUBLIC_WEB_URL,
     }),
   );
   endpoint(

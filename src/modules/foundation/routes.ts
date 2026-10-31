@@ -9,7 +9,8 @@ import { AppError, found, requireState } from '../../common/errors.js';
 import { audit, reference, outbox } from '../../common/operations.js';
 import { permissions } from '../../common/permissions.js';
 import { identityHash, encrypt, decrypt } from '../../common/security.js';
-import { passwordHash } from '../auth/service.js';
+import { passwordHash, verifyUserPassword } from '../auth/service.js';
+import { deleteBookingInTransaction } from '../sales/service.js';
 import { requireImage, requireGalleryImages, requireUnitImages } from '../images/service.js';
 import { defaultAccounts } from '../finance/service.js';
 import { scopedUnit, unitState } from '../inventory/service.js';
@@ -210,6 +211,18 @@ export function foundationRoutes(app: Express) {
       transaction(async (tx) => {
         await lock(tx, 'Project', ctx.projectId);
         const current = found(await tx.project.findUnique({ where: { id: ctx.projectId } }));
+        if (body.currency && body.currency !== current.currency) {
+          const history = await Promise.all([
+            tx.unit.count({ where: { projectId: ctx.projectId } }),
+            tx.journal.count({ where: { projectId: ctx.projectId } }),
+            tx.propertyPurchase.count({ where: { projectId: ctx.projectId } }),
+          ]);
+          requireState(
+            history.every((count) => count === 0),
+            'CURRENCY_LOCKED',
+            'Currency cannot change after property prices or financial records have been saved.',
+          );
+        }
         const gallery = await requireGalleryImages(tx, ctx, body, 'PROJECT', current);
         await requireImage(tx, ctx, body.logoId, 'PROJECT_LOGO');
         for (const item of body.featureImages ?? []) {
@@ -1013,6 +1026,67 @@ export function foundationRoutes(app: Express) {
   );
   endpoint(
     app,
+    'delete',
+    root + '/units/:id',
+    {
+      permission: 'users.manage',
+      summary:
+        'Permanently delete an uncommitted property with administrator password confirmation',
+      body: z.object({ password: z.string().min(1) }).strict(),
+    },
+    async (ctx, b, _q, req) => {
+      const valid = await verifyUserPassword(ctx.actor.id, b.password);
+      if (!valid) {
+        throw new AppError(401, 'INVALID_PASSWORD', 'Incorrect administrator password.');
+      }
+      return transaction(async (tx) => {
+        const unit = await scopedUnit(tx, ctx, id(req));
+        requireState(
+          ['AVAILABLE', 'BLOCKED'].includes(unit.status),
+          'UNIT_ALREADY_COMMITTED',
+          'Retract the active booking before deleting this property.',
+        );
+        requireState(
+          !(await tx.propertyPurchase.count({ where: { unitId: unit.id } })),
+          'PROPERTY_HAS_PURCHASE_HISTORY',
+          'This property has acquisition history. Keep it in the inventory for financial reference.',
+        );
+
+        const activeBooking = await tx.booking.findFirst({
+          where: { unitId: unit.id, status: { not: 'CANCELLED' } },
+        });
+        requireState(
+          !activeBooking,
+          'PROPERTY_HAS_ACTIVE_BOOKINGS',
+          'Cannot delete property with active bookings. Please unassign or delete the bookings first.',
+          422,
+        );
+
+        const cancelledBookings = await tx.booking.findMany({
+          where: { unitId: unit.id },
+          select: { id: true },
+        });
+        for (const cb of cancelledBookings) {
+          await deleteBookingInTransaction(tx, ctx, cb.id);
+        }
+
+        await tx.unitHistory.deleteMany({ where: { unitId: unit.id } });
+        await tx.reservation.deleteMany({ where: { unitId: unit.id } });
+        await tx.dealerAllocation.deleteMany({ where: { unitId: unit.id } });
+        await tx.propertyPurchase.updateMany({
+          where: { unitId: unit.id },
+          data: { unitId: null },
+        });
+
+        await tx.unit.delete({ where: { id: unit.id } });
+        await audit(tx, ctx, 'inventory.deleted', unit.id, { number: unit.number });
+
+        return { deleted: true, unitId: unit.id, number: unit.number };
+      });
+    },
+  );
+  endpoint(
+    app,
     'post',
     root + '/customers',
     {
@@ -1128,11 +1202,14 @@ export function foundationRoutes(app: Express) {
           available: false,
           exists: true,
           reason: 'This email is already registered to a member.',
-          existingMember: {
-            name: existingCustomer.name,
-            reference: existingCustomer.reference,
-            sameProject: existingCustomer.projectId === ctx.projectId,
-          },
+          existingMember:
+            existingCustomer.projectId === ctx.projectId
+              ? {
+                  name: existingCustomer.name,
+                  reference: existingCustomer.reference,
+                  sameProject: true,
+                }
+              : null,
         };
       }
 
@@ -1147,11 +1224,7 @@ export function foundationRoutes(app: Express) {
           available: false,
           exists: true,
           reason: 'This email is already associated with an existing user account.',
-          existingMember: {
-            name: existingUser.name,
-            reference: undefined,
-            sameProject: true,
-          },
+          existingMember: null,
         };
       }
 

@@ -12,9 +12,10 @@ import {
   id,
   idempotencyKey,
 } from '../../common/http.js';
-import { positiveMoney, sum, decimal } from '../../common/money.js';
-import { found } from '../../common/errors.js';
+import { positiveMoney, money, sum, decimal } from '../../common/money.js';
+import { found, AppError } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
+import { verifyUserPassword } from '../auth/service.js';
 import * as sales from './service.js';
 import { bookingInput, paymentTerms } from './payment-plan.js';
 const root = '/projects/:projectId';
@@ -245,6 +246,99 @@ export function salesRoutes(app: Express) {
       summary: 'Confirm booking',
     },
     async (ctx, b, _q, req) => sales.confirmBooking(ctx, id(req)),
+  );
+  const unassignBody = z
+    .object({
+      refundMode: z.enum(['FULL', 'CUSTOM']),
+      customRefundAmount: money.optional(),
+      customDeduction: money.optional(),
+      reason: z.string().max(1000).optional(),
+    })
+    .strict();
+  endpoint(
+    app,
+    'post',
+    root + '/bookings/:id/unassign',
+    {
+      permission: 'bookings.cancel',
+      summary: 'Retract booking and unassign property with full or custom refund',
+      body: unassignBody,
+    },
+    async (ctx, b, _q, req) => sales.unassignBookingOrUnit(ctx, { bookingId: id(req) }, b),
+  );
+  endpoint(
+    app,
+    'post',
+    root + '/units/:id/unassign',
+    {
+      permission: 'bookings.cancel',
+      summary: 'Retract active booking and unassign property with full or custom refund',
+      body: unassignBody,
+    },
+    async (ctx, b, _q, req) => sales.unassignBookingOrUnit(ctx, { unitId: id(req) }, b),
+  );
+  endpoint(
+    app,
+    'get',
+    root + '/units/:id/unassign-preview',
+    {
+      permission: 'bookings.read',
+      summary: 'Preview unassign data: active booking, collections and customer',
+    },
+    async (ctx, _b, _q, req) => {
+      const unit = found(
+        await db.unit.findFirst({
+          where: { id: id(req), projectId: ctx.projectId },
+          include: {
+            bookings: {
+              where: { status: { in: ['CONFIRMED', 'DRAFT'] } },
+              include: {
+                customer: { select: { id: true, name: true, phone: true, reference: true } },
+                payments: { where: { status: 'CLEARED' }, select: { amount: true } },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        }),
+      );
+      const activeBooking = unit.bookings[0];
+      const collected = activeBooking
+        ? sum(activeBooking.payments.map((p) => p.amount))
+        : decimal(0);
+      return {
+        unitId: unit.id,
+        unitNumber: unit.number,
+        unitStatus: unit.status,
+        booking: activeBooking
+          ? {
+              id: activeBooking.id,
+              reference: activeBooking.reference,
+              total: activeBooking.total.toFixed(2),
+              customer: activeBooking.customer,
+              collected: collected.toFixed(2),
+            }
+          : null,
+      };
+    },
+  );
+  endpoint(
+    app,
+    'delete',
+    root + '/bookings/:id',
+    {
+      permission: 'users.manage',
+      summary:
+        'Permanently delete an empty draft or unpaid cancelled booking with administrator password confirmation',
+      body: z.object({ password: z.string().min(1) }).strict(),
+    },
+    async (ctx, b, _q, req) => {
+      const valid = await verifyUserPassword(ctx.actor.id, b.password);
+      if (!valid) {
+        throw new AppError(401, 'INVALID_PASSWORD', 'Incorrect administrator password.');
+      }
+      return sales.deleteBooking(ctx, id(req));
+    },
   );
   const revisionBody = z
     .object({

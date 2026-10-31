@@ -4,7 +4,7 @@ import { requireImage } from '../images/service.js';
 import { Prisma } from '@prisma/client';
 import { transaction, lock, type Tx } from '../../database/client.js';
 import type { Context } from '../../common/context.js';
-import { found, requireState } from '../../common/errors.js';
+import { found, requireState, AppError } from '../../common/errors.js';
 import { decimal, sum } from '../../common/money.js';
 import { audit, reference, outbox, idempotent, json } from '../../common/operations.js';
 import { scopedUnit, unitState } from '../inventory/service.js';
@@ -215,7 +215,11 @@ export async function createPayment(
   return transaction(async (tx) =>
     idempotent(tx, ctx, 'payment.create', key, input, async () => {
       const payment = await createPaymentInTransaction(tx, ctx, input);
-      if (ctx.actor.isSuperAdmin) {
+      if (
+        ctx.actor.isSuperAdmin &&
+        input.method === 'CASH' &&
+        ctx.actor.permissions.has('payments.verify')
+      ) {
         return verifyPaymentInTransaction(
           tx,
           ctx,
@@ -717,4 +721,283 @@ export async function reschedule(
     await audit(tx, ctx, 'booking.rescheduled', bookingId, { version });
     return bookingPosition(tx, bookingId);
   });
+}
+
+export async function unassignBookingOrUnit(
+  ctx: Context,
+  target: { unitId?: string; bookingId?: string },
+  options: {
+    refundMode: 'FULL' | 'CUSTOM';
+    customRefundAmount?: string | number;
+    customDeduction?: string | number;
+    reason?: string;
+  },
+) {
+  return transaction(async (tx) => {
+    let booking: Awaited<ReturnType<typeof scopedBooking>> | null = null;
+    if (target.bookingId) {
+      booking = await scopedBooking(tx, ctx, target.bookingId);
+    } else if (target.unitId) {
+      await scopedUnit(tx, ctx, target.unitId);
+      booking = await tx.booking.findFirst({
+        where: {
+          unitId: target.unitId,
+          status: { in: ['CONFIRMED', 'DRAFT'] },
+          unit: { projectId: ctx.projectId },
+        },
+        include: {
+          unit: true,
+          customer: {
+            select: { id: true, reference: true, name: true, fatherName: true, phone: true },
+          },
+          owners: { where: { validTo: null } },
+        },
+      });
+      if (!booking) {
+        booking = await tx.booking.findFirst({
+          where: {
+            unitId: target.unitId,
+            status: { not: 'CANCELLED' },
+            unit: { projectId: ctx.projectId },
+          },
+          include: {
+            unit: true,
+            customer: {
+              select: { id: true, reference: true, name: true, fatherName: true, phone: true },
+            },
+            owners: { where: { validTo: null } },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+    }
+
+    if (!booking) {
+      throw new AppError(404, 'BOOKING_NOT_FOUND', 'No active booking found for this property.');
+    }
+
+    await lock(tx, 'Booking', booking.id);
+    const unit = await scopedUnit(tx, ctx, booking.unitId);
+    booking = await scopedBooking(tx, ctx, booking.id);
+    requireState(
+      ['DRAFT', 'CONFIRMED'].includes(booking.status),
+      'BOOKING_CANCELLED',
+      'This booking has already been cancelled. Review its existing refund instead.',
+    );
+    requireState(
+      ['BOOKED', 'SOLD'].includes(unit.status) &&
+        !(await tx.transfer.count({
+          where: { bookingId: booking.id, status: { in: ['PENDING', 'COMPLETED'] } },
+        })) &&
+        !(await tx.possession.count({
+          where: { bookingId: booking.id, status: { in: ['PENDING', 'COMPLETED'] } },
+        })),
+      'OWNERSHIP_CONFLICT',
+      'Resolve the transfer or possession before retracting this booking.',
+    );
+
+    const collected = await clearedTotal(tx, booking.id);
+    let returnAmount: Prisma.Decimal;
+    let deduction: Prisma.Decimal;
+
+    if (options.refundMode === 'FULL') {
+      returnAmount = collected;
+      deduction = decimal(0);
+    } else {
+      if (options.customRefundAmount !== undefined && options.customRefundAmount !== '') {
+        returnAmount = decimal(options.customRefundAmount).clamp(0, collected);
+        deduction = collected.minus(returnAmount);
+      } else if (options.customDeduction !== undefined && options.customDeduction !== '') {
+        deduction = decimal(options.customDeduction).clamp(0, collected);
+        returnAmount = collected.minus(deduction);
+      } else {
+        returnAmount = collected;
+        deduction = decimal(0);
+      }
+    }
+
+    const reason = options.reason?.trim() || 'Booking retracted and property unassigned';
+
+    let cancellation = await tx.cancellation.findUnique({ where: { bookingId: booking.id } });
+    if (!cancellation) {
+      cancellation = await tx.cancellation.create({
+        data: {
+          bookingId: booking.id,
+          deduction,
+          refundable: returnAmount,
+          reason,
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          requestedBy: ctx.actor.id,
+        },
+      });
+    } else {
+      cancellation = await tx.cancellation.update({
+        where: { id: cancellation.id },
+        data: {
+          deduction,
+          refundable: returnAmount,
+          reason,
+          status: 'COMPLETED',
+          completedAt: new Date(),
+        },
+      });
+    }
+
+    if (deduction.gt(0)) {
+      await postJournal(tx, ctx, {
+        source: 'CANCELLATION',
+        sourceId: cancellation.id,
+        description: `Booking retraction deduction - ${booking.reference}`,
+        lines: [
+          {
+            accountId: await mappedAccount(tx, ctx.projectId, 'advances'),
+            debit: deduction,
+            credit: 0,
+          },
+          {
+            accountId: await mappedAccount(tx, ctx.projectId, 'deductions'),
+            debit: 0,
+            credit: deduction,
+          },
+        ],
+      });
+    }
+
+    if (returnAmount.gt(0)) {
+      await tx.refund.create({
+        data: {
+          cancellationId: cancellation.id,
+          amount: returnAmount,
+          status: 'PENDING',
+          requestedBy: ctx.actor.id,
+        },
+      });
+    }
+
+    const commission = await tx.dealerCommission.findUnique({ where: { bookingId: booking.id } });
+    if (commission) {
+      if (commission.status === 'COMPLETED') {
+        await postJournal(tx, ctx, {
+          source: 'COMMISSION_CLAWBACK',
+          sourceId: commission.id,
+          description: `Dealer commission recoverable after retraction - ${booking.reference}`,
+          lines: [
+            {
+              accountId: await mappedAccount(tx, ctx.projectId, 'dealerRecoverable'),
+              debit: commission.amount,
+              credit: 0,
+            },
+            {
+              accountId: await mappedAccount(tx, ctx.projectId, 'commissionExpense'),
+              debit: 0,
+              credit: commission.amount,
+            },
+          ],
+        });
+      }
+      await tx.dealerCommission.update({
+        where: { id: commission.id },
+        data: { status: 'REJECTED' },
+      });
+    }
+
+    await tx.booking.update({
+      where: { id: booking.id },
+      data: { status: 'CANCELLED' },
+    });
+
+    await tx.bookingOwner.updateMany({
+      where: { bookingId: booking.id, validTo: null },
+      data: { validTo: new Date() },
+    });
+
+    await tx.payment.updateMany({
+      where: { bookingId: booking.id, status: 'PENDING' },
+      data: { status: 'REJECTED' },
+    });
+    await tx.ndc.updateMany({
+      where: { bookingId: booking.id, status: { in: ['APPROVED', 'PENDING'] } },
+      data: { status: 'REJECTED' },
+    });
+    await tx.possession.updateMany({
+      where: { bookingId: booking.id, status: 'PENDING' },
+      data: { status: 'REJECTED' },
+    });
+
+    await unitState(tx, ctx, booking.unitId, 'AVAILABLE', reason);
+
+    await audit(tx, ctx, 'booking.unassigned', booking.id, {
+      unitId: booking.unitId,
+      collected: collected.toFixed(2),
+      returnAmount: returnAmount.toFixed(2),
+      deduction: deduction.toFixed(2),
+      refundMode: options.refundMode,
+      reason,
+    });
+
+    return {
+      success: true,
+      bookingId: booking.id,
+      unitId: booking.unitId,
+      collected: collected.toFixed(2),
+      returnAmount: returnAmount.toFixed(2),
+      deduction: deduction.toFixed(2),
+      status: 'AVAILABLE',
+    };
+  });
+}
+
+export async function deleteBooking(ctx: Context, bookingId: string) {
+  return transaction((tx) => deleteBookingInTransaction(tx, ctx, bookingId));
+}
+
+export async function deleteBookingInTransaction(tx: Tx, ctx: Context, bookingId: string) {
+  requireState(
+    ctx.actor.permissions.has('users.manage'),
+    'FORBIDDEN',
+    'Administrator access is required for permanent deletion.',
+    403,
+  );
+  const booking = await scopedBooking(tx, ctx, bookingId);
+  await scopedUnit(tx, ctx, booking.unitId);
+  requireState(
+    ['DRAFT', 'CANCELLED'].includes(booking.status),
+    'BOOKING_HAS_HISTORY',
+    'Retract this booking first. Confirmed ownership cannot be permanently deleted.',
+  );
+  const [payments, transfers, possessions, refunds, commissions, documents, recovery] =
+    await Promise.all([
+      tx.payment.count({ where: { bookingId } }),
+      tx.transfer.count({ where: { bookingId } }),
+      tx.possession.count({ where: { bookingId } }),
+      tx.refund.count({ where: { cancellation: { bookingId } } }),
+      tx.dealerCommission.count({ where: { bookingId } }),
+      tx.document.count({ where: { bookingId } }),
+      tx.recoveryCase.count({ where: { bookingId } }),
+    ]);
+  requireState(
+    !(payments || transfers || possessions || refunds || commissions || documents || recovery),
+    'BOOKING_HAS_HISTORY',
+    'This booking has financial or workflow history. Keep the cancelled record for reference; it cannot be permanently deleted.',
+  );
+  await tx.installment.deleteMany({ where: { bookingId } });
+  await tx.scheduleRevision.deleteMany({ where: { bookingId } });
+  await tx.bookingOwner.deleteMany({ where: { bookingId } });
+  await tx.cancellation.deleteMany({ where: { bookingId } });
+  await tx.ndc.deleteMany({ where: { bookingId } });
+  await tx.booking.delete({ where: { id: bookingId } });
+  if (booking.status === 'DRAFT')
+    await unitState(
+      tx,
+      ctx,
+      booking.unitId,
+      'AVAILABLE',
+      `Empty draft ${booking.reference} deleted by administrator`,
+    );
+  await audit(tx, ctx, 'booking.deleted', booking.id, {
+    reference: booking.reference,
+    unitNumber: booking.unit.number,
+  });
+  return { deleted: true, bookingId: booking.id };
 }

@@ -58,19 +58,74 @@ export function responseSchema(path: string, method: string, hasPagination: bool
       minimumClientVersion: str,
       platforms: array(str),
       onlineRequired: bool,
+      publicWebUrl: { type: 'string', format: 'uri' },
     });
   if (path === '/roles' && method === 'get')
     return object({ roles: array(ref('Role')), permissions: array(str) });
   if (path === '/verify/file/:reference')
+    return {
+      type: 'object',
+      required: ['valid', 'verifiedAt'],
+      properties: {
+        valid: bool,
+        reference: str,
+        verifiedAt: str,
+        message: str,
+        status: str,
+        projectName: str,
+        projectCode: str,
+        propertyNumber: str,
+        propertyType: str,
+        confirmedAt: { type: ['string', 'null'] },
+      },
+    };
+  if (path === '/verify/employee/:identifier' || path === '/verify/customer/:identifier')
+    return {
+      type: 'object',
+      required: ['valid', 'verifiedAt'],
+      properties: {
+        valid: bool,
+        verifiedAt: str,
+        message: str,
+        status: str,
+        ...(path.includes('/employee/')
+          ? { employeeCode: str, name: str, active: bool }
+          : { customerCode: str, projectName: str, projectCode: str }),
+      },
+    };
+  if (path.endsWith('/installment-calendar'))
     return object({
-      valid: bool,
-      reference: str,
-      verifiedAt: str,
+      today: str,
+      days: array(
+        object({
+          date: str,
+          total: num,
+          overdue: num,
+          unpaid: num,
+          paid: num,
+          outstanding: ref('Money'),
+        }),
+      ),
     });
-  if (path === '/verify/employee/:id' || path === '/verify/customer/:id')
+  if (path.endsWith('/installment-calendar/day'))
     return object({
-      valid: bool,
-      verifiedAt: str,
+      items: array(
+        object({
+          id: str,
+          bookingId: str,
+          reference: str,
+          customerName: str,
+          customerPhone: str,
+          unitNumber: str,
+          label: str,
+          dueDate: str,
+          amount: ref('Money'),
+          paid: ref('Money'),
+          outstanding: ref('Money'),
+          overdue: ref('Money'),
+        }),
+      ),
+      pagination,
     });
   if (path.endsWith('/users/:id/documents')) return array(ref('Document'));
   if (path.endsWith('/users/:id/ledger')) {
@@ -114,7 +169,7 @@ export function responseSchema(path: string, method: string, hasPagination: bool
         totalExpenses: ref('Money'),
         totalInvestedCost: ref('Money'),
         totalSalesRevenue: ref('Money'),
-        totalNetProfit: ref('Money'),
+        totalRealizedProfit: ref('Money'),
         averageMarginPercent: str,
       }),
       deals: array(

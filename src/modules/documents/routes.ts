@@ -2,7 +2,7 @@ import type { Express } from 'express';
 import { randomUUID, createHash } from 'node:crypto';
 import path from 'node:path';
 import multer from 'multer';
-import { fileTypeFromBuffer } from 'file-type';
+import { documentMime } from './file-validation.js';
 import { z } from 'zod';
 import { db, transaction } from '../../database/client.js';
 import {
@@ -75,6 +75,29 @@ export function documentRoutes(app: Express) {
     },
     async (ctx, b, _q, req) => {
       const { audience, ...fields } = b;
+      if (b.userId) {
+        requireState(
+          ctx.actor.permissions.has('users.manage'),
+          'FORBIDDEN',
+          'Administrator access is required for staff documents.',
+          403,
+        );
+        requireState(
+          audience === 'STAFF_ONLY' && !b.customerId && !b.bookingId,
+          'PRIVATE_DOCUMENT_OWNER',
+          'Staff documents cannot be shared with customers.',
+          422,
+        );
+        found(
+          await db.user.findFirst({
+            where: {
+              id: b.userId,
+              accountType: 'STAFF',
+              projects: { some: { projectId: ctx.projectId } },
+            },
+          }),
+        );
+      }
       requireState(
         audience !== 'ALL_PROJECT_CUSTOMERS' || (!b.customerId && !b.bookingId),
         'PRIVATE_DOCUMENT_OWNER',
@@ -95,37 +118,8 @@ export function documentRoutes(app: Express) {
           403,
         );
       const file = found(req.file);
-      const detected = await fileTypeFromBuffer(file.buffer);
       const extension = path.extname(file.originalname).toLowerCase();
-      const allowedExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.docx', '.doc'];
-      const allowedMimes = [
-        'application/pdf',
-        'image/jpeg',
-        'image/png',
-        'image/webp',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/msword',
-        'application/zip',
-      ];
-      const valid =
-        allowedExts.includes(extension) &&
-        (detected
-          ? allowedMimes.includes(detected.mime)
-          : extension === '.docx' || extension === '.doc');
-      requireState(
-        valid,
-        'INVALID_FILE_TYPE',
-        'Upload a valid PDF, Word document (DOCX), or image (PNG, JPG, WEBP) with a matching extension.',
-        422,
-      );
-      const finalMime =
-        extension === '.docx'
-          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-          : extension === '.doc'
-            ? 'application/msword'
-            : detected
-              ? detected.mime
-              : 'application/octet-stream';
+      const finalMime = await documentMime(file.originalname, file.buffer);
       if (b.customerId)
         found(
           await db.customer.findFirst({ where: { id: b.customerId, projectId: ctx.projectId } }),

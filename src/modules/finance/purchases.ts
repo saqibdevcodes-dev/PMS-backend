@@ -9,7 +9,7 @@ import { positiveMoney, money, sum, decimal } from '../../common/money.js';
 import { found, requireState } from '../../common/errors.js';
 import { audit, reference } from '../../common/operations.js';
 import { postJournal, reverseJournal, type PostingLine } from './service.js';
-import { unitState } from '../inventory/service.js';
+import { unitState, scopedUnit, requireUncommittedUnit } from '../inventory/service.js';
 
 const expenseItemSchema = z.object({
   id: z.string().optional(),
@@ -368,6 +368,8 @@ export function purchaseRoutes(app: Express) {
           }),
         );
         if (current.status === 'VOIDED') return current;
+        if (current.unitId)
+          await requireUncommittedUnit(tx, await scopedUnit(tx, ctx, current.unitId));
         const reversal = current.journalId
           ? await reverseJournal(
               tx,
@@ -381,6 +383,14 @@ export function purchaseRoutes(app: Express) {
           data: { status: 'VOIDED', reversalId: reversal?.id, voidReason: input.reason },
           include,
         });
+        if (current.unitId)
+          await unitState(
+            tx,
+            ctx,
+            current.unitId,
+            'BLOCKED',
+            'Acquisition voided; review before listing',
+          );
         await audit(tx, ctx, 'purchase.voided', result.id, {
           reason: input.reason,
           reversalId: reversal?.id,
@@ -416,15 +426,8 @@ export function purchaseRoutes(app: Express) {
 
         let unit: Unit;
         if (current.unitId) {
-          unit = found(
-            await tx.unit.findFirst({ where: { id: current.unitId, projectId: ctx.projectId } }),
-          );
-          requireState(
-            unit.status !== 'BOOKED' && unit.status !== 'SOLD',
-            'UNIT_ALREADY_COMMITTED',
-            `This property is already ${unit.status} and cannot be relisted.`,
-            422,
-          );
+          unit = await scopedUnit(tx, ctx, current.unitId);
+          await requireUncommittedUnit(tx, unit);
           unit = await tx.unit.update({
             where: { id: unit.id },
             data: { price: input.askingPrice, status: 'AVAILABLE' },
