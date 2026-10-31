@@ -34,14 +34,6 @@ The shared checklist is a synthesis for recordkeeping, not a single nationwide l
 
 Deploy frontend and backend together: new requests contain `verification`; possession handover also needs `handoverReference` and `receivedByName`. The migration `202610160001_ownership_verification` adds these fields and makes the legacy transfer NDC link optional without deleting data.
 
-After pulling the code on the existing VPS installation:
-
-```sh
-cd /var/www/PMS-BE
-docker compose -p pms-be --profile app build api worker &&
-docker compose -p pms-be --profile app stop api worker &&
-docker compose -p pms-be --profile app run --rm --no-deps api npm run db:migrate &&
-docker compose -p pms-be --profile app up -d --no-deps --force-recreate api worker
-```
+Release through the [backend production pipeline](deployment.md#production-pipeline), which applies migrations and recreates API and worker in the existing `pms` project.
 
 Publish the matching frontend build through the existing deployment workflow, then refresh the browser.

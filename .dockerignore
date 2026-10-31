@@ -7,3 +7,4 @@ dist
 .runtime
 uploads
 coverage
+.deploy

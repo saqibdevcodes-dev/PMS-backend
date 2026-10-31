@@ -5,6 +5,7 @@ dist/
 !.env.example
 coverage/
 .runtime/
+.deploy/
 uploads/
 *.log
 branch_structure.json

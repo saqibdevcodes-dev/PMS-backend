@@ -43,13 +43,6 @@ Use your provider's real host and verified sender. Port 587 uses STARTTLS with `
 
 **Remove `SMTP_DOCKER_HOST=mail` from production `.env`, or set `SMTP_DOCKER_HOST` to the same real provider hostname.** This variable is only a local Docker override. Compose now respects `SMTP_HOST` instead of forcing the Mailpit test server. Local Node development uses `SMTP_HOST=localhost` on port 1025; local Docker uses `SMTP_DOCKER_HOST=mail` on the same port. Test suites override SMTP settings and only use mocked delivery or local Mailpit.
 
-After pushing these changes, rebuild and recreate the existing VPS services:
+Release these changes through the [backend production pipeline](deployment.md#production-pipeline). It recreates API and worker from the same validated release image in the active `pms` project.
 
-```bash
-cd /var/www/PMS-BE &&
-git pull --ff-only &&
-docker compose -p pms-be --profile app build api worker &&
-docker compose -p pms-be --profile app up -d --no-deps --force-recreate api worker
-```
-
-No database migration is needed for these email changes. Recreating both containers is required for changed `.env` values to take effect. Check `docker compose -p pms-be logs --tail=100 worker` for failed deliveries. Provider acceptance is recorded as success; final inbox placement depends on your provider and domain's mail configuration. SMTP cannot guarantee exactly-once delivery if the connection fails after the provider accepts a message. Emails use a stable Message-ID, and already recorded successful deliveries are skipped on retry.
+No database migration is needed for these email changes. Recreating both containers is required for changed `.env` values to take effect. Check `docker compose -p pms logs --tail=100 worker` for failed deliveries. Provider acceptance is recorded as success; final inbox placement depends on your provider and domain's mail configuration. SMTP cannot guarantee exactly-once delivery if the connection fails after the provider accepts a message. Emails use a stable Message-ID, and already recorded successful deliveries are skipped on retry.

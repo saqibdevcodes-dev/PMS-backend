@@ -7,6 +7,9 @@ COPY . .
 RUN DATABASE_URL=postgresql://unused:unused@localhost/unused npm run db:generate && npm run build
 
 FROM node:24-bookworm-slim AS runtime
+ARG RELEASE_REVISION=development
+LABEL org.opencontainers.image.revision=$RELEASE_REVISION
+ENV RELEASE_REVISION=$RELEASE_REVISION
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build --chown=node:node /app/package*.json ./
