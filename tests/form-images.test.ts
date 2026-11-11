@@ -981,9 +981,22 @@ describe('private record images and guided form contracts', () => {
     });
     expect((await patch({ photoIds: [otherUpload.id] })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
   });
-  it('edits property galleries within project scope without allowing price or status changes', async () => {
+  it('stores up to 20 property photos within project scope without allowing price or status changes', async () => {
     const photoIds = [];
-    for (let i = 0; i < 5; i++) photoIds.push(await upload('UNIT', projectId));
+    for (let i = 0; i < 20; i++) photoIds.push(await upload('UNIT', projectId));
+    const overflowPhoto = await upload('UNIT', projectId);
+    expect(
+      (
+        await post(`/projects/${projectId}/units`).send({
+          number: 'GALLERY-TOO-MANY',
+          type: 'APARTMENT',
+          size: '100',
+          measurementUnit: 'sq ft',
+          price: '1000',
+          photoIds: [...photoIds, overflowPhoto],
+        })
+      ).status,
+    ).toBe(422);
     const featureImages = [{ feature: 'Balcony', imageId: await upload('FEATURE', projectId) }];
     const created = await post(`/projects/${projectId}/units`).send({
       number: 'GALLERY-1',
@@ -1484,6 +1497,22 @@ describe('simplified project and payment workflows', () => {
     expect(purchase.status).toBe('DRAFT');
     expect(await db.journal.count({ where: { projectId: pid } })).toBe(0);
     const url = base + '/property-purchases/' + purchase.id;
+    const expenses = await request(app)
+      .patch('/api/v1' + url + '/expenses')
+      .set('Authorization', 'Bearer staff')
+      .send({
+        expenseItems: [
+          { name: 'Boundary wall repairs', category: 'Renovation & Building', amount: '1000.00' },
+        ],
+        notes: 'Expense draft saved before finalization',
+      });
+    expect(expenses.status, expenses.text).toBe(200);
+    expect(expenses.body.data).toMatchObject({
+      status: 'DRAFT',
+      notes: 'Expense draft saved before finalization',
+    });
+    expect(decimal(expenses.body.data.total).toFixed(2)).toBe('1016521.50');
+    expect(expenses.body.data.expenseItems).toHaveLength(1);
     expect(
       (await get('/projects/' + projectId + '/property-purchases/' + purchase.id)).status,
     ).toBe(404);
@@ -1498,7 +1527,11 @@ describe('simplified project and payment workflows', () => {
     const changed = await request(app)
       .patch('/api/v1' + url)
       .set('Authorization', 'Bearer staff')
-      .send({ ...input, title: 'Reviewed acquisition' });
+      .send({
+        ...input,
+        title: 'Reviewed acquisition',
+        expenseItems: expenses.body.data.expenseItems,
+      });
     expect(changed.status, changed.text).toBe(200);
     expect(
       (
@@ -1515,6 +1548,14 @@ describe('simplified project and payment workflows', () => {
     const posted = await post(url + '/post').send(confirmation);
     expect(posted.status, posted.text).toBe(200);
     expect(posted.body.data.status).toBe('POSTED');
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1' + url + '/expenses')
+          .set('Authorization', 'Bearer staff')
+          .send({ expenseItems: [] })
+      ).body.code,
+    ).toBe('PURCHASE_EXPENSES_LOCKED');
     expect((await post(url + '/post').send(confirmation)).body.data.journalId).toBe(
       posted.body.data.journalId,
     );
@@ -1522,14 +1563,14 @@ describe('simplified project and payment workflows', () => {
       where: { id: posted.body.data.journalId },
       include: { lines: { include: { account: true } } },
     });
-    expect(sum(journal.lines.map((l) => l.debit)).toFixed(2)).toBe('1015521.50');
-    expect(sum(journal.lines.map((l) => l.credit)).toFixed(2)).toBe('1015521.50');
+    expect(sum(journal.lines.map((l) => l.debit)).toFixed(2)).toBe('1016521.50');
+    expect(sum(journal.lines.map((l) => l.credit)).toFixed(2)).toBe('1016521.50');
     expect(journal.lines.find((l) => l.vendorId === seller.body.data.id)?.credit.toFixed(2)).toBe(
       '1000000.10',
     );
     expect(
       journal.lines.find((l) => l.account.code === 'SYS-ACQUISITION-ACCRUALS')?.credit.toFixed(2),
-    ).toBe('15521.40');
+    ).toBe('16521.40');
     expect(
       await db.journal.count({ where: { source: 'PROPERTY_PURCHASE', sourceId: purchase.id } }),
     ).toBe(1);

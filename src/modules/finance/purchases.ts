@@ -39,7 +39,16 @@ const body = z
 const include = {
   vendor: { select: { id: true, name: true, phone: true } },
   unit: {
-    select: { id: true, number: true, type: true, floor: true, size: true, measurementUnit: true },
+    select: {
+      id: true,
+      number: true,
+      type: true,
+      floor: true,
+      size: true,
+      measurementUnit: true,
+      status: true,
+      price: true,
+    },
   },
   dealer: { select: { id: true, name: true, phone: true } },
   journal: { select: { id: true, reference: true } },
@@ -263,6 +272,86 @@ export function purchaseRoutes(app: Express) {
           include,
         });
         await audit(tx, ctx, 'purchase.updated', result.id, { total: result.total.toFixed(2) });
+        return result;
+      }),
+  );
+  endpoint(
+    app,
+    'patch',
+    root + '/:id/expenses',
+    {
+      permission: 'finance.post',
+      summary: 'Save itemized property expenses while the acquisition remains a draft',
+      body: z
+        .object({
+          expenseItems: z.array(expenseItemSchema).default([]),
+          notes: z.string().trim().max(2000).optional(),
+        })
+        .strict(),
+    },
+    async (ctx, input, _q, req) =>
+      transaction(async (tx) => {
+        await lock(tx, 'Project', ctx.projectId);
+        const current = found(
+          await tx.propertyPurchase.findFirst({
+            where: { id: id(req), projectId: ctx.projectId },
+            include,
+          }),
+        );
+        requireState(
+          current.status === 'DRAFT',
+          'PURCHASE_EXPENSES_LOCKED',
+          'Finalized properties cannot receive additional lifecycle expenses.',
+          422,
+        );
+
+        const previousItems = z.array(expenseItemSchema).safeParse(current.expenseItems);
+        const previousExpenseTotal = previousItems.success
+          ? sum(previousItems.data.map((item) => item.amount))
+          : decimal(0);
+        const baseOtherCosts = decimal(current.otherCosts).minus(previousExpenseTotal);
+        requireState(
+          baseOtherCosts.gte(0),
+          'PURCHASE_COST_INVALID',
+          'The existing property cost breakdown is invalid. Review the purchase draft.',
+          422,
+        );
+
+        const expenseItems = input.expenseItems.map((item) => ({
+          ...item,
+          id: item.id || crypto.randomUUID(),
+        }));
+        const expenseTotal = sum(expenseItems.map((item) => item.amount));
+        const otherCosts = baseOtherCosts.plus(expenseTotal);
+        const total = sum([
+          current.price,
+          current.taxes,
+          current.legalFees,
+          current.brokerage,
+          otherCosts,
+        ]);
+        requireState(
+          total.lt('10000000000000000'),
+          'AMOUNT_TOO_LARGE',
+          'The total acquisition cost is too large.',
+          422,
+        );
+
+        const result = await tx.propertyPurchase.update({
+          where: { id: current.id },
+          data: {
+            expenseItems,
+            otherCosts,
+            total,
+            ...(input.notes === undefined ? {} : { notes: input.notes }),
+          },
+          include,
+        });
+        await audit(tx, ctx, 'purchase.expenses_updated', result.id, {
+          expenseItems: expenseItems.length,
+          expenseTotal: expenseTotal.toFixed(2),
+          total: result.total.toFixed(2),
+        });
         return result;
       }),
   );

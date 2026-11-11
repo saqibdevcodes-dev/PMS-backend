@@ -54,7 +54,7 @@ const unitFields = z
     type: z.enum(['RESIDENTIAL_PLOT', 'COMMERCIAL_PLOT', 'APARTMENT', 'SHOP', 'OFFICE', 'OTHER']),
     typeDetails: z.string().trim().min(2).max(100).optional(),
     photoId: uuid.optional(),
-    photoIds: z.array(uuid).max(5).optional(),
+    photoIds: z.array(uuid).max(20).optional(),
     featureImages: z
       .array(z.object({ feature: z.string().min(1).max(100), imageId: uuid }).strict())
       .max(30)
@@ -79,6 +79,12 @@ const unitBody = unitFields.superRefine((v, ctx) => {
       message: 'Describe the property type.',
     });
 });
+const phoneNumber = z
+  .string()
+  .trim()
+  .min(6)
+  .max(30)
+  .refine((value) => value.replace(/\D/g, '').length >= 10, 'Enter a valid phone number.');
 export const customerBody = z
   .object({
     name: z.string().min(2).max(200),
@@ -86,11 +92,8 @@ export const customerBody = z
       (v) => (v === '' ? null : v),
       z.string().max(200).nullable().optional(),
     ),
-    phone: z.string().min(6).max(30),
-    secondaryPhone: z.preprocess(
-      (v) => (v === '' ? null : v),
-      z.string().max(30).nullable().optional(),
-    ),
+    phone: phoneNumber,
+    secondaryPhone: z.preprocess((v) => (v === '' ? null : v), phoneNumber.nullable().optional()),
     email: z.preprocess((v) => (v === '' ? null : v), z.string().email().nullable().optional()),
     address: z.preprocess((v) => (v === '' ? null : v), z.string().max(1000).nullable().optional()),
     photoId: z.preprocess((v) => (v === '' ? null : v), uuid.nullable().optional()),
@@ -929,7 +932,7 @@ export function foundationRoutes(app: Express) {
     {
       permission: 'inventory.update',
       summary:
-        'Update property details and up to five photos; price changes use the Change price action',
+        'Update property details and up to 20 photos; price changes use the Change price action',
       body: unitFields.omit({ price: true, charges: true }).partial().extend({
         photoId: uuid.nullable().optional(),
         features: unitFields.shape.features.removeDefault().optional(),

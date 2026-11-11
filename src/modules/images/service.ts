@@ -79,10 +79,11 @@ export async function requireGalleryImages(
           ),
         ]
       : []);
+  const maximum = purpose === 'UNIT' ? 20 : 5;
   requireState(
-    photoIds.length <= 5 && new Set(photoIds).size === photoIds.length,
+    photoIds.length <= maximum && new Set(photoIds).size === photoIds.length,
     'INVALID_GALLERY',
-    'Choose up to five different photos.',
+    `Choose up to ${maximum} different photos.`,
     422,
   );
   const photoId = photoIds[0] ?? null;
