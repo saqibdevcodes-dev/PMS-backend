@@ -5,6 +5,7 @@ import type { ReportRow } from '../modules/reports/service.js';
 import {
   excelNumber,
   exportColumns,
+  exportFilterEntries,
   exportLabel,
   exportPalette as color,
   exportValue,
@@ -145,9 +146,11 @@ export function reportWorkbook(input: WorkbookInput) {
       });
       row.height = Math.min(409, Math.max(26, lines * 14 + 12));
     });
-    if (!rows.length) {
+    if (!rows.length || !columns.length) {
       const empty = worksheet.getRow(header + 1);
-      empty.getCell(1).value = 'No entries for the selected period.';
+      empty.getCell(1).value = rows.length
+        ? 'No displayable report fields are available.'
+        : 'No entries for the selected period.';
       empty.getCell(1).font = {
         name: 'Arial',
         size: 10,
@@ -232,9 +235,7 @@ export function reportWorkbook(input: WorkbookInput) {
     const columns = exportColumns(input.rows);
     const worksheet = sheet(input.title, columns);
     let header = 7;
-    const filters = Object.entries(input.filters ?? {}).filter(
-      ([key, value]) => key !== 'kind' && value != null && value !== '',
-    );
+    const filters = exportFilterEntries(input.filters);
     for (const [key, value] of filters) {
       worksheet.getCell(header, 1).value = `${exportLabel(key)}: ${String(value)}`;
       worksheet.getCell(header, 1).font = { name: 'Arial', size: 10, color: { argb: color.muted } };

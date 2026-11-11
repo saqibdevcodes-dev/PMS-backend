@@ -45,6 +45,11 @@ const lockTables = [
   'DealerCommission',
   'Project',
   'BackgroundJob',
+  'Vendor',
+  'PropertyPurchase',
+  'SupplierPayment',
+  'Expense',
+  'CapitalTransaction',
 ] as const;
 export async function lock(tx: Tx, table: (typeof lockTables)[number], id: string) {
   if (!lockTables.includes(table)) throw new Error('Invalid lock target');

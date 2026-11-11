@@ -182,45 +182,49 @@ model Device {
 }
 
 model Project {
-  logoId             String?               @db.Uuid
-  logo               ImageAsset?           @relation("ProjectLogo", fields: [logoId], references: [id], onDelete: Restrict)
-  location           String                @default("")
-  description        String                @default("")
-  features           String[]              @default([])
-  featureImages      Json                  @default("[]")
-  photoIds           String[]              @default([]) @db.Uuid
-  photoId            String?               @db.Uuid
-  photo              ImageAsset?           @relation("ProjectPhoto", fields: [photoId], references: [id], onDelete: Restrict)
-  id                 String                @id @default(uuid()) @db.Uuid
-  code               String                @unique
-  name               String
-  currency           String                @default("PKR")
-  timezone           String                @default("Asia/Karachi")
-  reservationMinutes Int                   @default(60)
-  downPaymentPercent Decimal               @default(20) @db.Decimal(5, 2)
-  graceDays          Int                   @default(0)
-  ndcValidityDays    Int                   @default(30)
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  access             UserProjectAccess[]
-  units              Unit[]
-  customers          Customer[]
-  leads              Lead[]
-  plans              PaymentPlan[]
-  dealers            Dealer[]
-  approvals          Approval[]
-  policies           ApprovalPolicy[]
-  accounts           Account[]
-  periods            AccountingPeriod[]
-  journals           Journal[]
-  settings           ProjectSetting[]
-  documents          Document[]
-  templates          DocumentTemplate[]
-  jobs               BackgroundJob[]
-  banks              BankAccount[]
-  vendors            Vendor[]
-  propertyPurchases  PropertyPurchase[]
-  employeeLedgers    EmployeeLedgerEntry[]
+  logoId              String?               @db.Uuid
+  logo                ImageAsset?           @relation("ProjectLogo", fields: [logoId], references: [id], onDelete: Restrict)
+  location            String                @default("")
+  description         String                @default("")
+  features            String[]              @default([])
+  featureImages       Json                  @default("[]")
+  photoIds            String[]              @default([]) @db.Uuid
+  photoId             String?               @db.Uuid
+  photo               ImageAsset?           @relation("ProjectPhoto", fields: [photoId], references: [id], onDelete: Restrict)
+  id                  String                @id @default(uuid()) @db.Uuid
+  code                String                @unique
+  name                String
+  currency            String                @default("PKR")
+  timezone            String                @default("Asia/Karachi")
+  reservationMinutes  Int                   @default(60)
+  downPaymentPercent  Decimal               @default(20) @db.Decimal(5, 2)
+  graceDays           Int                   @default(0)
+  ndcValidityDays     Int                   @default(30)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  access              UserProjectAccess[]
+  units               Unit[]
+  customers           Customer[]
+  leads               Lead[]
+  plans               PaymentPlan[]
+  dealers             Dealer[]
+  approvals           Approval[]
+  policies            ApprovalPolicy[]
+  accounts            Account[]
+  periods             AccountingPeriod[]
+  journals            Journal[]
+  settings            ProjectSetting[]
+  documents           Document[]
+  templates           DocumentTemplate[]
+  jobs                BackgroundJob[]
+  banks               BankAccount[]
+  vendors             Vendor[]
+  propertyPurchases   PropertyPurchase[]
+  employeeLedgers     EmployeeLedgerEntry[]
+  expenses            Expense[]
+  supplierPayments    SupplierPayment[]
+  partners            Partner[]
+  capitalTransactions CapitalTransaction[]
 }
 
 model ProjectSetting {
@@ -261,6 +265,7 @@ model Unit {
   bookings        Booking[]
   allocations     DealerAllocation[]
   purchases       PropertyPurchase[]
+  expenses        Expense[]
 
   @@unique([projectId, number])
   @@index([projectId, status, type])
@@ -747,18 +752,29 @@ model Snag {
 }
 
 model Account {
-  id        String        @id @default(uuid()) @db.Uuid
-  projectId String        @db.Uuid
-  code      String
-  name      String
-  type      AccountType
-  active    Boolean       @default(true)
-  project   Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  lines     JournalLine[]
-  payments  Payment[]
-  banks     BankAccount[]
+  id                     String               @id @default(uuid()) @db.Uuid
+  projectId              String               @db.Uuid
+  code                   String
+  name                   String
+  type                   AccountType
+  category               String               @default("OTHER")
+  parentId               String?              @db.Uuid
+  active                 Boolean              @default(true)
+  project                Project              @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  parent                 Account?             @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children               Account[]            @relation("AccountHierarchy")
+  lines                  JournalLine[]
+  payments               Payment[]
+  banks                  BankAccount[]
+  expenseAccounts        Expense[]            @relation("ExpenseAccount")
+  expensePaymentAccounts Expense[]            @relation("ExpensePaymentAccount")
+  supplierPayments       SupplierPayment[]    @relation("SupplierPaymentAccount")
+  partnerCapital         Partner[]            @relation("PartnerCapitalAccount")
+  capitalCashAccounts    CapitalTransaction[] @relation("CapitalCashAccount")
 
   @@unique([projectId, code])
+  @@index([projectId, category])
+  @@index([parentId])
 }
 
 model AccountingPeriod {
@@ -774,25 +790,31 @@ model AccountingPeriod {
 }
 
 model Journal {
-  purchase           PropertyPurchase? @relation("PurchaseJournal")
-  reversedPurchase   PropertyPurchase? @relation("PurchaseReversal")
-  createdTransaction BigInt            @default(dbgenerated("txid_current()")) @ignore
-  id                 String            @id @default(uuid()) @db.Uuid
-  projectId          String            @db.Uuid
-  periodId           String            @db.Uuid
-  reference          String            @unique
-  source             String
-  sourceId           String            @db.Uuid
-  description        String
-  postedAt           DateTime
-  createdBy          String            @db.Uuid
-  reversalOfId       String?           @unique @db.Uuid
-  createdAt          DateTime          @default(now())
-  project            Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  period             AccountingPeriod  @relation(fields: [periodId], references: [id], onDelete: Restrict)
-  lines              JournalLine[]
-  reversalOf         Journal?          @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversal           Journal?          @relation("JournalReversal")
+  purchase                   PropertyPurchase?   @relation("PurchaseJournal")
+  reversedPurchase           PropertyPurchase?   @relation("PurchaseReversal")
+  supplierPayment            SupplierPayment?    @relation("SupplierPaymentJournal")
+  reversedSupplierPayment    SupplierPayment?    @relation("SupplierPaymentReversal")
+  expense                    Expense?            @relation("ExpenseJournal")
+  reversedExpense            Expense?            @relation("ExpenseReversal")
+  capitalTransaction         CapitalTransaction? @relation("CapitalTransactionJournal")
+  reversedCapitalTransaction CapitalTransaction? @relation("CapitalTransactionReversal")
+  createdTransaction         BigInt              @default(dbgenerated("txid_current()")) @ignore
+  id                         String              @id @default(uuid()) @db.Uuid
+  projectId                  String              @db.Uuid
+  periodId                   String              @db.Uuid
+  reference                  String              @unique
+  source                     String
+  sourceId                   String              @db.Uuid
+  description                String
+  postedAt                   DateTime
+  createdBy                  String              @db.Uuid
+  reversalOfId               String?             @unique @db.Uuid
+  createdAt                  DateTime            @default(now())
+  project                    Project             @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  period                     AccountingPeriod    @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  lines                      JournalLine[]
+  reversalOf                 Journal?            @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal                   Journal?            @relation("JournalReversal")
 
   @@unique([source, sourceId])
   @@index([projectId, postedAt])
@@ -836,57 +858,167 @@ model BankReconciliation {
 }
 
 model Vendor {
-  category  String             @default("SUPPLIER")
-  email     String?
-  address   String             @default("")
-  purchases PropertyPurchase[]
-  lines     JournalLine[]
-  id        String             @id @default(uuid()) @db.Uuid
-  projectId String             @db.Uuid
-  name      String
-  phone     String
-  project   Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  category         String             @default("SUPPLIER")
+  email            String?
+  address          String             @default("")
+  purchases        PropertyPurchase[]
+  lines            JournalLine[]
+  supplierPayments SupplierPayment[]
+  expenses         Expense[]
+  id               String             @id @default(uuid()) @db.Uuid
+  projectId        String             @db.Uuid
+  name             String
+  phone            String
+  project          Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
 }
 
 model PropertyPurchase {
-  id            String    @id @default(uuid()) @db.Uuid
-  projectId     String    @db.Uuid
-  vendorId      String    @db.Uuid
-  reference     String    @unique
+  id            String            @id @default(uuid()) @db.Uuid
+  projectId     String            @db.Uuid
+  vendorId      String            @db.Uuid
+  reference     String            @unique
   title         String
   location      String
-  purchaseDate  DateTime  @db.Date
-  price         Decimal   @db.Decimal(18, 2)
-  taxes         Decimal   @default(0) @db.Decimal(18, 2)
-  legalFees     Decimal   @default(0) @db.Decimal(18, 2)
-  brokerage     Decimal   @default(0) @db.Decimal(18, 2)
-  otherCosts    Decimal   @default(0) @db.Decimal(18, 2)
-  total         Decimal   @db.Decimal(18, 2)
+  purchaseDate  DateTime          @db.Date
+  price         Decimal           @db.Decimal(18, 2)
+  taxes         Decimal           @default(0) @db.Decimal(18, 2)
+  legalFees     Decimal           @default(0) @db.Decimal(18, 2)
+  brokerage     Decimal           @default(0) @db.Decimal(18, 2)
+  otherCosts    Decimal           @default(0) @db.Decimal(18, 2)
+  total         Decimal           @db.Decimal(18, 2)
   fileReference String
-  notes         String    @default("")
-  status        String    @default("DRAFT")
-  journalId     String?   @unique @db.Uuid
-  reversalId    String?   @unique @db.Uuid
-  createdBy     String    @db.Uuid
-  postedBy      String?   @db.Uuid
+  notes         String            @default("")
+  status        String            @default("DRAFT")
+  journalId     String?           @unique @db.Uuid
+  reversalId    String?           @unique @db.Uuid
+  createdBy     String            @db.Uuid
+  postedBy      String?           @db.Uuid
   postedAt      DateTime?
   voidReason    String?
-  unitId        String?   @db.Uuid
-  dealerId      String?   @db.Uuid
-  expenseItems  Json      @default("[]")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  project       Project   @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  vendor        Vendor    @relation(fields: [vendorId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  unit          Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  dealer        Dealer?   @relation(fields: [dealerId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  journal       Journal?  @relation("PurchaseJournal", fields: [journalId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  reversal      Journal?  @relation("PurchaseReversal", fields: [reversalId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  unitId        String?           @db.Uuid
+  dealerId      String?           @db.Uuid
+  expenseItems  Json              @default("[]")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  vendor        Vendor            @relation(fields: [vendorId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  unit          Unit?             @relation(fields: [unitId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  dealer        Dealer?           @relation(fields: [dealerId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  journal       Journal?          @relation("PurchaseJournal", fields: [journalId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  reversal      Journal?          @relation("PurchaseReversal", fields: [reversalId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  payments      SupplierPayment[]
+  expenses      Expense[]
 
   @@unique([projectId, vendorId, fileReference])
   @@index([projectId, purchaseDate])
   @@index([unitId])
   @@index([dealerId])
+}
+
+model SupplierPayment {
+  id                   String            @id @default(uuid()) @db.Uuid
+  projectId            String            @db.Uuid
+  vendorId             String            @db.Uuid
+  purchaseId           String?           @db.Uuid
+  paymentAccountId     String            @db.Uuid
+  reference            String            @unique
+  amount               Decimal           @db.Decimal(18, 2)
+  paidAt               DateTime
+  method               String
+  transactionReference String?
+  notes                String            @default("")
+  status               String            @default("POSTED")
+  journalId            String            @unique @db.Uuid
+  reversalId           String?           @unique @db.Uuid
+  createdBy            String            @db.Uuid
+  createdAt            DateTime          @default(now())
+  project              Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  vendor               Vendor            @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  purchase             PropertyPurchase? @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  paymentAccount       Account           @relation("SupplierPaymentAccount", fields: [paymentAccountId], references: [id], onDelete: Restrict)
+  journal              Journal           @relation("SupplierPaymentJournal", fields: [journalId], references: [id], onDelete: Restrict)
+  reversal             Journal?          @relation("SupplierPaymentReversal", fields: [reversalId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, paidAt])
+  @@index([vendorId, purchaseId])
+}
+
+model Expense {
+  id                   String            @id @default(uuid()) @db.Uuid
+  projectId            String            @db.Uuid
+  purchaseId           String?           @db.Uuid
+  unitId               String?           @db.Uuid
+  vendorId             String?           @db.Uuid
+  expenseAccountId     String            @db.Uuid
+  paymentAccountId     String            @db.Uuid
+  reference            String            @unique
+  category             String
+  treatment            String            @default("OPERATING")
+  description          String
+  amount               Decimal           @db.Decimal(18, 2)
+  incurredAt           DateTime
+  method               String
+  transactionReference String?
+  status               String            @default("POSTED")
+  journalId            String            @unique @db.Uuid
+  reversalId           String?           @unique @db.Uuid
+  createdBy            String            @db.Uuid
+  createdAt            DateTime          @default(now())
+  project              Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  purchase             PropertyPurchase? @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  unit                 Unit?             @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  vendor               Vendor?           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  expenseAccount       Account           @relation("ExpenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  paymentAccount       Account           @relation("ExpensePaymentAccount", fields: [paymentAccountId], references: [id], onDelete: Restrict)
+  journal              Journal           @relation("ExpenseJournal", fields: [journalId], references: [id], onDelete: Restrict)
+  reversal             Journal?          @relation("ExpenseReversal", fields: [reversalId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, incurredAt])
+  @@index([unitId])
+  @@index([purchaseId])
+  @@index([expenseAccountId])
+}
+
+model Partner {
+  id               String               @id @default(uuid()) @db.Uuid
+  projectId        String               @db.Uuid
+  name             String
+  phone            String?
+  email            String?
+  active           Boolean              @default(true)
+  capitalAccountId String               @unique @db.Uuid
+  createdAt        DateTime             @default(now())
+  project          Project              @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  capitalAccount   Account              @relation("PartnerCapitalAccount", fields: [capitalAccountId], references: [id], onDelete: Restrict)
+  transactions     CapitalTransaction[]
+
+  @@unique([projectId, name])
+  @@index([projectId, active])
+}
+
+model CapitalTransaction {
+  id            String   @id @default(uuid()) @db.Uuid
+  projectId     String   @db.Uuid
+  partnerId     String   @db.Uuid
+  cashAccountId String   @db.Uuid
+  reference     String   @unique
+  kind          String
+  amount        Decimal  @db.Decimal(18, 2)
+  transactedAt  DateTime
+  description   String
+  status        String   @default("POSTED")
+  journalId     String   @unique @db.Uuid
+  reversalId    String?  @unique @db.Uuid
+  createdBy     String   @db.Uuid
+  createdAt     DateTime @default(now())
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  partner       Partner  @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  cashAccount   Account  @relation("CapitalCashAccount", fields: [cashAccountId], references: [id], onDelete: Restrict)
+  journal       Journal  @relation("CapitalTransactionJournal", fields: [journalId], references: [id], onDelete: Restrict)
+  reversal      Journal? @relation("CapitalTransactionReversal", fields: [reversalId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, transactedAt])
+  @@index([partnerId, transactedAt])
 }
 
 model Document {

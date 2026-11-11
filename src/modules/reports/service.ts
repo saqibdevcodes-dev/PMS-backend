@@ -32,6 +32,34 @@ export const reportKinds = [
   'income-statement',
   'balance-sheet',
   'deal-profitability',
+  'sales-payment-report',
+  'product-sales-report',
+  'sales-by-clients-top-5',
+  'sales-by-products-top-5',
+  'sale-order-report',
+  'invoice-aging-sales',
+  'detailed-sales-report',
+  'sales-return-report',
+  'product-purchase-report',
+  'purchase-report',
+  'invoice-aging-purchase',
+  'purchase-order-report',
+  'detailed-purchase-report',
+  'purchase-return-report',
+  'pnl-cogs-periodic',
+  'pnl-stock-change-periodic',
+  'pnl-cogs',
+  'pnl-opening-closing-stock',
+  'productwise-profit-loss',
+  'invoicewise-profit-loss',
+  'clientwise-profit-loss',
+  'expense-report',
+  'detailed-expense-report',
+  'inventory-report',
+  'inventory-valuation-fifo',
+  'day-book',
+  'cash-flow',
+  'tax-report',
 ] as const;
 export const reportQuery = z
   .object({
@@ -44,6 +72,7 @@ export const reportQuery = z
     accountId: z.uuid().optional(),
     vendorId: z.uuid().optional(),
     assignedTo: z.uuid().optional(),
+    granularity: z.enum(['daily', 'weekly', 'monthly']).optional(),
   })
   .strict()
   .refine((q) => !q.from || !q.to || q.from <= q.to, 'Invalid date range');
@@ -103,8 +132,301 @@ async function queryReport(
     found(await tx.vendor.findFirst({ where: { id: q.vendorId, projectId } }));
   }
   switch (q.kind) {
+    case 'sales-payment-report':
+    case 'detailed-sales-report': {
+      const bookings = await tx.booking.findMany({
+        where: { ...bookingWhere, createdAt: dates, status: 'CONFIRMED' },
+        include: {
+          customer: { select: { id: true, name: true } },
+          unit: { select: { id: true, number: true, type: true } },
+          payments: { where: { status: 'CLEARED' }, select: { amount: true, paidAt: true } },
+          installments: {
+            where: { superseded: false },
+            include: { allocations: { where: { reversedAt: null }, select: { amount: true } } },
+          },
+        },
+        take,
+        orderBy: { createdAt: 'desc' },
+      });
+      return bookings.map((booking) => {
+        const received = sum(booking.payments.map((payment) => payment.amount));
+        const outstanding = sum(
+          booking.installments.map((installment) =>
+            installment.amount.minus(sum(installment.allocations.map((item) => item.amount))),
+          ),
+        );
+        return {
+          bookingId: booking.id,
+          reference: booking.reference,
+          date: booking.createdAt.toISOString(),
+          customerId: booking.customer.id,
+          customerName: booking.customer.name,
+          propertyId: booking.unit.id,
+          propertyNumber: booking.unit.number,
+          propertyType: booking.unit.type,
+          saleAmount: booking.total.toFixed(2),
+          received: received.toFixed(2),
+          outstanding: outstanding.toFixed(2),
+          paymentStatus: outstanding.lte(0) ? 'PAID' : received.gt(0) ? 'PARTIALLY_PAID' : 'UNPAID',
+        };
+      });
+    }
+    case 'product-sales-report':
+    case 'sales-by-products-top-5': {
+      const bookings = await tx.booking.findMany({
+        where: { ...bookingWhere, createdAt: dates, status: 'CONFIRMED' },
+        select: { total: true, unit: { select: { type: true } } },
+      });
+      const grouped = new Map<string, { count: number; total: Prisma.Decimal }>();
+      for (const booking of bookings) {
+        const current = grouped.get(booking.unit.type) ?? { count: 0, total: decimal(0) };
+        current.count += 1;
+        current.total = current.total.plus(booking.total);
+        grouped.set(booking.unit.type, current);
+      }
+      const rows = [...grouped.entries()]
+        .map(([propertyType, item]) => ({
+          propertyType,
+          propertiesSold: item.count,
+          salesAmount: item.total.toFixed(2),
+        }))
+        .sort((a, b) => decimal(b.salesAmount).cmp(a.salesAmount));
+      return q.kind === 'sales-by-products-top-5' ? rows.slice(0, 5) : rows;
+    }
+    case 'sales-by-clients-top-5': {
+      const bookings = await tx.booking.findMany({
+        where: { ...bookingWhere, createdAt: dates, status: 'CONFIRMED' },
+        select: { total: true, customer: { select: { id: true, name: true } } },
+      });
+      const grouped = new Map<string, { name: string; count: number; total: Prisma.Decimal }>();
+      for (const booking of bookings) {
+        const current = grouped.get(booking.customer.id) ?? {
+          name: booking.customer.name,
+          count: 0,
+          total: decimal(0),
+        };
+        current.count += 1;
+        current.total = current.total.plus(booking.total);
+        grouped.set(booking.customer.id, current);
+      }
+      return [...grouped.entries()]
+        .map(([customerId, item]) => ({
+          customerId,
+          customerName: item.name,
+          salesCount: item.count,
+          salesAmount: item.total.toFixed(2),
+        }))
+        .sort((a, b) => decimal(b.salesAmount).cmp(a.salesAmount))
+        .slice(0, 5);
+    }
+    case 'sale-order-report':
+      return (
+        await tx.booking.findMany({
+          where: { ...bookingWhere, createdAt: dates, status: 'DRAFT' },
+          include: {
+            customer: { select: { name: true } },
+            unit: { select: { number: true, type: true } },
+          },
+          take,
+          orderBy: { createdAt: 'desc' },
+        })
+      ).map((booking) => ({
+        reference: booking.reference,
+        date: booking.createdAt.toISOString(),
+        customerName: booking.customer.name,
+        propertyNumber: booking.unit.number,
+        propertyType: booking.unit.type,
+        orderAmount: booking.total.toFixed(2),
+        status: booking.status,
+      }));
+    case 'sales-return-report':
+      return (
+        await tx.cancellation.findMany({
+          where: { booking: bookingWhere, completedAt: dates },
+          include: {
+            booking: {
+              select: {
+                reference: true,
+                customer: { select: { name: true } },
+                unit: { select: { number: true } },
+                payments: { where: { status: 'CLEARED' }, select: { amount: true } },
+              },
+            },
+            refunds: { select: { amount: true, status: true } },
+          },
+          take,
+          orderBy: { completedAt: 'desc' },
+        })
+      ).map((item) => ({
+        reference: item.booking.reference,
+        customerName: item.booking.customer.name,
+        propertyNumber: item.booking.unit.number,
+        cancelledAt: item.completedAt?.toISOString() ?? '',
+        collected: sum(item.booking.payments.map((payment) => payment.amount)).toFixed(2),
+        deduction: item.deduction.toFixed(2),
+        refundable: item.refundable.toFixed(2),
+        refunded: sum(
+          item.refunds
+            .filter((refund) => refund.status === 'COMPLETED')
+            .map((refund) => refund.amount),
+        ).toFixed(2),
+        status: item.status,
+      }));
+    case 'product-purchase-report':
+    case 'purchase-report':
+    case 'detailed-purchase-report':
+    case 'purchase-order-report':
+    case 'purchase-return-report':
+    case 'invoice-aging-purchase': {
+      const status =
+        q.kind === 'purchase-order-report'
+          ? 'DRAFT'
+          : q.kind === 'purchase-return-report'
+            ? 'VOIDED'
+            : 'POSTED';
+      const purchases = await tx.propertyPurchase.findMany({
+        where: {
+          projectId,
+          status,
+          purchaseDate: dates,
+          vendorId: q.vendorId,
+          ...(q.phase ? { unit: { phase: q.phase } } : {}),
+        },
+        include: {
+          vendor: { select: { id: true, name: true } },
+          unit: { select: { id: true, number: true, type: true, status: true } },
+          payments: { where: { status: 'POSTED' }, select: { amount: true, paidAt: true } },
+        },
+        take,
+        orderBy: { purchaseDate: 'desc' },
+      });
+      if (q.kind === 'product-purchase-report') {
+        const grouped = new Map<string, { count: number; amount: Prisma.Decimal }>();
+        for (const purchase of purchases) {
+          const type = purchase.unit?.type ?? 'Unlisted property';
+          const current = grouped.get(type) ?? { count: 0, amount: decimal(0) };
+          current.count += 1;
+          current.amount = current.amount.plus(purchase.total);
+          grouped.set(type, current);
+        }
+        return [...grouped.entries()].map(([propertyType, item]) => ({
+          propertyType,
+          propertiesPurchased: item.count,
+          acquisitionCost: item.amount.toFixed(2),
+        }));
+      }
+      const today = DateTime.now().setZone(project.timezone).startOf('day');
+      return purchases
+        .map((purchase) => {
+          const paid = sum(purchase.payments.map((payment) => payment.amount));
+          const outstanding = purchase.price.minus(paid);
+          const ageDays = Math.max(
+            0,
+            Math.floor(today.diff(DateTime.fromJSDate(purchase.purchaseDate), 'days').days),
+          );
+          return {
+            purchaseId: purchase.id,
+            reference: purchase.reference,
+            purchaseDate: purchase.purchaseDate.toISOString().slice(0, 10),
+            supplierId: purchase.vendor.id,
+            supplierName: purchase.vendor.name,
+            propertyNumber: purchase.unit?.number ?? '',
+            propertyType: purchase.unit?.type ?? purchase.title,
+            purchasePrice: purchase.price.toFixed(2),
+            directCosts: purchase.total.minus(purchase.price).toFixed(2),
+            acquisitionCost: purchase.total.toFixed(2),
+            supplierPayments: paid.toFixed(2),
+            supplierOutstanding: outstanding.toFixed(2),
+            paymentStatus: outstanding.lte(0) ? 'PAID' : paid.gt(0) ? 'PARTIALLY_PAID' : 'UNPAID',
+            ageDays,
+            ageingBucket:
+              ageDays <= 30 ? '0-30' : ageDays <= 60 ? '31-60' : ageDays <= 90 ? '61-90' : '90+',
+            status: purchase.status,
+          };
+        })
+        .filter(
+          (row) => q.kind !== 'invoice-aging-purchase' || decimal(row.supplierOutstanding).gt(0),
+        );
+    }
+    case 'expense-report':
+    case 'detailed-expense-report': {
+      const expenses = await tx.expense.findMany({
+        where: {
+          projectId,
+          incurredAt: dates,
+          status: 'POSTED',
+          expenseAccountId: q.accountId,
+          unit: q.phase ? { phase: q.phase } : undefined,
+        },
+        include: {
+          expenseAccount: { select: { code: true, name: true } },
+          paymentAccount: { select: { code: true, name: true } },
+          unit: { select: { number: true } },
+          purchase: { select: { reference: true } },
+          vendor: { select: { name: true } },
+        },
+        take,
+        orderBy: { incurredAt: 'desc' },
+      });
+      if (q.kind === 'expense-report') {
+        const grouped = new Map<
+          string,
+          { account: string; treatment: string; total: Prisma.Decimal }
+        >();
+        for (const expense of expenses) {
+          const key = `${expense.expenseAccountId}:${expense.category}:${expense.treatment}`;
+          const current = grouped.get(key) ?? {
+            account: expense.expenseAccount.name,
+            treatment: expense.treatment,
+            total: decimal(0),
+          };
+          current.total = current.total.plus(expense.amount);
+          grouped.set(key, current);
+        }
+        return [...grouped.entries()].map(([key, item]) => ({
+          category: key.split(':')[1] ?? '',
+          accountName: item.account,
+          treatment: item.treatment,
+          total: item.total.toFixed(2),
+        }));
+      }
+      return expenses.map((expense) => ({
+        reference: expense.reference,
+        date: expense.incurredAt.toISOString(),
+        category: expense.category,
+        treatment: expense.treatment,
+        accountCode: expense.expenseAccount.code,
+        accountName: expense.expenseAccount.name,
+        description: expense.description,
+        propertyNumber: expense.unit?.number ?? '',
+        purchaseReference: expense.purchase?.reference ?? '',
+        supplierName: expense.vendor?.name ?? '',
+        paymentAccount: expense.paymentAccount.name,
+        amount: expense.amount.toFixed(2),
+      }));
+    }
+    case 'inventory-report':
     case 'inventory':
       return (await tx.unit.findMany({ where: unit, take, orderBy: { number: 'asc' } })).map(flat);
+    case 'inventory-valuation-fifo': {
+      const purchases = await tx.propertyPurchase.findMany({
+        where: { projectId, status: 'POSTED', unitId: { not: null }, purchaseDate: dates },
+        include: { unit: { select: { number: true, type: true, status: true } } },
+        take,
+        orderBy: [{ purchaseDate: 'asc' }, { id: 'asc' }],
+      });
+      return purchases.map((purchase, index) => ({
+        fifoSequence: index + 1,
+        purchaseReference: purchase.reference,
+        acquisitionDate: purchase.purchaseDate.toISOString().slice(0, 10),
+        propertyNumber: purchase.unit?.number ?? '',
+        propertyType: purchase.unit?.type ?? '',
+        propertyStatus: purchase.unit?.status ?? '',
+        uniquelyIdentified: true,
+        acquisitionCost: purchase.total.toFixed(2),
+        valuationBasis: 'Specific property cost in acquisition order; pooled FIFO is not applied',
+      }));
+    }
     case 'sales':
       return (
         await tx.booking.findMany({
@@ -212,7 +534,8 @@ async function queryReport(
       return (await customerStatementReport(tx, projectId, q, limit)).rows;
     case 'installments':
     case 'outstanding':
-    case 'ageing': {
+    case 'ageing':
+    case 'invoice-aging-sales': {
       const rows = await tx.installment.findMany({
         where: {
           booking: { ...bookingWhere, status: { not: 'CANCELLED' } },
@@ -284,7 +607,8 @@ async function queryReport(
         .filter(
           (r) =>
             q.kind === 'installments' ||
-            (decimal(r.outstanding).gt(0) && (q.kind !== 'ageing' || r.lateDays > 0)),
+            (decimal(r.outstanding).gt(0) &&
+              (!['ageing', 'invoice-aging-sales'].includes(q.kind) || r.lateDays > 0)),
         );
     }
     case 'defaulters': {
@@ -440,6 +764,266 @@ async function queryReport(
       return (await tx.transfer.findMany({ where: { booking: bookingWhere }, take })).map(flat);
     case 'possession':
       return (await tx.possession.findMany({ where: { booking: bookingWhere }, take })).map(flat);
+    case 'productwise-profit-loss':
+    case 'invoicewise-profit-loss':
+    case 'clientwise-profit-loss': {
+      const purchases = await tx.propertyPurchase.findMany({
+        where: { projectId, status: 'POSTED', purchaseDate: dates, unitId: { not: null } },
+        include: {
+          unit: {
+            include: {
+              bookings: {
+                where: { status: 'CONFIRMED' },
+                include: {
+                  customer: { select: { id: true, name: true } },
+                  payments: { where: { status: 'CLEARED' }, select: { amount: true } },
+                },
+                take: 1,
+              },
+            },
+          },
+          expenses: {
+            where: { status: 'POSTED', treatment: 'CAPITALIZED' },
+            select: { amount: true },
+          },
+        },
+      });
+      const positions = purchases
+        .map((purchase) => {
+          const booking = purchase.unit?.bookings[0];
+          if (!booking) return null;
+          const cost = purchase.total.plus(sum(purchase.expenses.map((expense) => expense.amount)));
+          const received = sum(booking.payments.map((payment) => payment.amount));
+          return {
+            purchaseReference: purchase.reference,
+            bookingReference: booking.reference,
+            customerId: booking.customer.id,
+            customerName: booking.customer.name,
+            propertyType: purchase.unit?.type ?? '',
+            propertyNumber: purchase.unit?.number ?? '',
+            saleAmount: booking.total,
+            received,
+            cost,
+            profit: booking.total.minus(cost),
+            realized: received.gte(booking.total),
+          };
+        })
+        .filter((row): row is NonNullable<typeof row> => Boolean(row));
+      if (q.kind === 'invoicewise-profit-loss')
+        return positions.map((row) => ({
+          ...row,
+          saleAmount: row.saleAmount.toFixed(2),
+          received: row.received.toFixed(2),
+          cost: row.cost.toFixed(2),
+          profit: row.profit.toFixed(2),
+        }));
+      const grouped = new Map<
+        string,
+        { label: string; sales: Prisma.Decimal; cost: Prisma.Decimal; count: number }
+      >();
+      for (const row of positions) {
+        const key = q.kind === 'clientwise-profit-loss' ? row.customerId : row.propertyType;
+        const label = q.kind === 'clientwise-profit-loss' ? row.customerName : row.propertyType;
+        const current = grouped.get(key) ?? {
+          label,
+          sales: decimal(0),
+          cost: decimal(0),
+          count: 0,
+        };
+        current.sales = current.sales.plus(row.saleAmount);
+        current.cost = current.cost.plus(row.cost);
+        current.count += 1;
+        grouped.set(key, current);
+      }
+      return [...grouped.entries()].map(([key, row]) => ({
+        id: key,
+        name: row.label,
+        salesCount: row.count,
+        salesAmount: row.sales.toFixed(2),
+        cost: row.cost.toFixed(2),
+        profit: row.sales.minus(row.cost).toFixed(2),
+      }));
+    }
+    case 'pnl-cogs':
+    case 'pnl-cogs-periodic':
+    case 'pnl-stock-change-periodic': {
+      const lines = await tx.journalLine.findMany({
+        where: {
+          journal: { projectId, postedAt: dates },
+          account: {
+            type: { in: ['REVENUE', 'EXPENSE', 'ASSET'] },
+            ...(q.kind === 'pnl-stock-change-periodic'
+              ? { code: 'SYS-PROPERTY-INVENTORY' }
+              : { type: { in: ['REVENUE', 'EXPENSE'] } }),
+          },
+        },
+        include: {
+          journal: { select: { postedAt: true } },
+          account: { select: { type: true, code: true, name: true, category: true } },
+        },
+        orderBy: { journal: { postedAt: 'asc' } },
+      });
+      const granularity = q.granularity ?? 'monthly';
+      const grouped = new Map<
+        string,
+        { revenue: Prisma.Decimal; expense: Prisma.Decimal; stockChange: Prisma.Decimal }
+      >();
+      for (const line of lines) {
+        const date = DateTime.fromJSDate(line.journal.postedAt).setZone(project.timezone);
+        const key =
+          granularity === 'daily'
+            ? date.toISODate()!
+            : granularity === 'weekly'
+              ? date.startOf('week').toISODate()!
+              : date.startOf('month').toFormat('yyyy-MM');
+        const current = grouped.get(key) ?? {
+          revenue: decimal(0),
+          expense: decimal(0),
+          stockChange: decimal(0),
+        };
+        if (line.account.type === 'REVENUE')
+          current.revenue = current.revenue.plus(line.credit).minus(line.debit);
+        else if (line.account.type === 'EXPENSE')
+          current.expense = current.expense.plus(line.debit).minus(line.credit);
+        if (line.account.code === 'SYS-PROPERTY-INVENTORY')
+          current.stockChange = current.stockChange.plus(line.debit).minus(line.credit);
+        grouped.set(key, current);
+      }
+      return [...grouped.entries()].map(([period, row]) => ({
+        period,
+        granularity,
+        revenue: row.revenue.toFixed(2),
+        recognizedExpenses: row.expense.toFixed(2),
+        inventoryChange: row.stockChange.toFixed(2),
+        netProfit:
+          q.kind === 'pnl-stock-change-periodic'
+            ? row.revenue.minus(row.expense).minus(row.stockChange).toFixed(2)
+            : row.revenue.minus(row.expense).toFixed(2),
+        basis:
+          q.kind === 'pnl-stock-change-periodic'
+            ? 'Posted revenue and expenses less posted property-inventory increase'
+            : 'Posted revenue and recognized expense ledger accounts',
+      }));
+    }
+    case 'pnl-opening-closing-stock': {
+      const inventory = found(
+        await tx.account.findFirst({ where: { projectId, code: 'SYS-PROPERTY-INVENTORY' } }),
+        'No posted property acquisition inventory account exists yet.',
+      );
+      const boundaryBalance = async (before?: Date) => {
+        const aggregate = await tx.journalLine.aggregate({
+          where: {
+            accountId: inventory.id,
+            journal: { projectId, postedAt: before ? { lt: before } : undefined },
+          },
+          _sum: { debit: true, credit: true },
+        });
+        return (aggregate._sum.debit ?? decimal(0)).minus(aggregate._sum.credit ?? 0);
+      };
+      const opening = await boundaryBalance(dates.gte);
+      const closing = await boundaryBalance(dates.lt);
+      const income = await tx.journalLine.findMany({
+        where: {
+          journal: { projectId, postedAt: dates },
+          account: { type: { in: ['REVENUE', 'EXPENSE'] } },
+        },
+        include: { account: { select: { type: true } } },
+      });
+      const revenue = sum(
+        income
+          .filter((line) => line.account.type === 'REVENUE')
+          .map((line) => line.credit.minus(line.debit)),
+      );
+      const expenses = sum(
+        income
+          .filter((line) => line.account.type === 'EXPENSE')
+          .map((line) => line.debit.minus(line.credit)),
+      );
+      return [
+        {
+          openingPropertyInventory: opening.toFixed(2),
+          closingPropertyInventory: closing.toFixed(2),
+          inventoryChange: closing.minus(opening).toFixed(2),
+          revenue: revenue.toFixed(2),
+          recognizedExpenses: expenses.toFixed(2),
+          netProfit: revenue.minus(expenses).toFixed(2),
+          basis: 'Specific-cost property inventory; no generic pooled stock assumption',
+        },
+      ];
+    }
+    case 'day-book':
+      return (
+        await tx.journal.findMany({
+          where: { projectId, postedAt: dates },
+          include: { lines: { include: { account: { select: { code: true, name: true } } } } },
+          take,
+          orderBy: [{ postedAt: 'asc' }, { reference: 'asc' }],
+        })
+      ).flatMap((journal) =>
+        journal.lines.map((line) => ({
+          date: journal.postedAt.toISOString(),
+          reference: journal.reference,
+          source: journal.source,
+          description: journal.description,
+          accountCode: line.account.code,
+          accountName: line.account.name,
+          debit: line.debit.toFixed(2),
+          credit: line.credit.toFixed(2),
+        })),
+      );
+    case 'cash-flow': {
+      const bankIds = (
+        await tx.bankAccount.findMany({ where: { projectId }, select: { accountId: true } })
+      ).map((account) => account.accountId);
+      const setting = await tx.projectSetting.findUnique({
+        where: { projectId_key: { projectId, key: 'accounting' } },
+      });
+      const cashId = (setting?.value as Record<string, string> | null)?.cash;
+      const accountIds = [
+        ...new Set([cashId, ...bankIds].filter((value): value is string => !!value)),
+      ];
+      return (
+        await tx.journalLine.findMany({
+          where: { accountId: { in: accountIds }, journal: { projectId, postedAt: dates } },
+          include: {
+            journal: {
+              select: { reference: true, postedAt: true, source: true, description: true },
+            },
+            account: { select: { code: true, name: true } },
+          },
+          take,
+          orderBy: { journal: { postedAt: 'asc' } },
+        })
+      ).map((line) => ({
+        date: line.journal.postedAt.toISOString(),
+        reference: line.journal.reference,
+        source: line.journal.source,
+        description: line.journal.description,
+        accountCode: line.account.code,
+        accountName: line.account.name,
+        inflow: line.debit.toFixed(2),
+        outflow: line.credit.toFixed(2),
+        netCashFlow: line.debit.minus(line.credit).toFixed(2),
+      }));
+    }
+    case 'tax-report':
+      return (
+        await tx.propertyPurchase.findMany({
+          where: { projectId, status: 'POSTED', purchaseDate: dates, taxes: { gt: 0 } },
+          include: { vendor: { select: { name: true } }, unit: { select: { number: true } } },
+          take,
+          orderBy: { purchaseDate: 'asc' },
+        })
+      ).map((purchase) => ({
+        date: purchase.purchaseDate.toISOString().slice(0, 10),
+        reference: purchase.reference,
+        supplierName: purchase.vendor.name,
+        propertyNumber: purchase.unit?.number ?? '',
+        taxablePurchaseBase: purchase.price.toFixed(2),
+        nonRecoverableAcquisitionTax: purchase.taxes.toFixed(2),
+        taxTreatment: 'Capitalized in property acquisition cost',
+        limitation: 'No configured sales-tax or withholding workflow exists in the current schema',
+      }));
     case 'vendor-ledger':
     case 'cash-book':
     case 'bank-book':

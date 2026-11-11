@@ -5,6 +5,7 @@ import { drawDocumentBrand, type DocumentBranding } from './project-branding.js'
 import {
   exportAmountWords,
   exportColumns,
+  exportFilterEntries,
   exportLabel,
   exportPalette,
   exportValue,
@@ -139,8 +140,7 @@ export function pdfBuffer(
           y += 23;
         }
         if (!continued) {
-          const filters = Object.entries(options.filters ?? {})
-            .filter(([key, value]) => key !== 'kind' && value != null && value !== '')
+          const filters = exportFilterEntries(options.filters)
             .map(([key, value]) => `${exportLabel(key)}: ${String(value)}`)
             .join(' / ');
           for (const line of lines(filters, width, 8))
@@ -165,10 +165,12 @@ export function pdfBuffer(
           }
           y += 7;
         }
-      } else if (!rows.length) {
+      } else if (!rows.length || !columns.length) {
         header(false);
         text(
-          'No entries for the selected period.',
+          rows.length
+            ? 'No displayable report fields are available.'
+            : 'No entries for the selected period.',
           left,
           y + 12,
           width,

@@ -149,14 +149,16 @@ export async function reverseJournal(tx: Tx, ctx: Context, journalId: string, re
 }
 export async function defaultAccounts(tx: Tx, projectId: string) {
   const definitions = [
-    ['1000', 'Cash and bank', 'ASSET', 'cash'],
-    ['2000', 'Customer advances', 'LIABILITY', 'advances'],
-    ['4000', 'Cancellation deductions', 'REVENUE', 'deductions'],
-    ['4100', 'Transfer services', 'REVENUE', 'transferRevenue'],
+    ['1000', 'Cash and bank', 'ASSET', 'ASSET', 'cash'],
+    ['2000', 'Customer advances', 'LIABILITY', 'CUSTOMER', 'advances'],
+    ['4000', 'Cancellation deductions', 'REVENUE', 'SALES', 'deductions'],
+    ['4100', 'Transfer services', 'REVENUE', 'SALES', 'transferRevenue'],
   ] as const;
   const mapping: Record<string, string> = {};
-  for (const [code, name, type, key] of definitions) {
-    const account = await tx.account.create({ data: { projectId, code, name, type } });
+  for (const [code, name, type, category, key] of definitions) {
+    const account = await tx.account.create({
+      data: { projectId, code, name, type, category },
+    });
     mapping[key] = account.id;
   }
   await tx.projectSetting.create({ data: { projectId, key: 'accounting', value: mapping } });

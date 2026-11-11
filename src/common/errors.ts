@@ -16,7 +16,10 @@ export function requireState(
 ): asserts condition {
   if (!condition) throw new AppError(status, code, message);
 }
-export function found<T>(value: T | null | undefined): T {
-  if (value == null) throw new AppError(404, 'NOT_FOUND', 'The requested record was not found.');
+export function found<T>(
+  value: T | null | undefined,
+  message = 'The requested record was not found.',
+): T {
+  if (value == null) throw new AppError(404, 'NOT_FOUND', message);
   return value;
 }

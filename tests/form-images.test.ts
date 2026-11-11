@@ -52,6 +52,7 @@ import { signedDownload, putObject } from '../src/integrations/storage.js';
 import { login } from '../src/modules/auth/service.js';
 import { workflowRoutes } from '../src/modules/workflows/routes.js';
 import { financeRoutes } from '../src/modules/finance/routes.js';
+import { reportRoutes } from '../src/modules/reports/routes.js';
 import { transferChecks, possessionChecks, handoverReceipt } from './ownership-fixtures.js';
 import { decrypt } from '../src/common/security.js';
 import { resendCredentials, deliverCredentials } from '../src/modules/portal/credentials.js';
@@ -71,6 +72,7 @@ documentRoutes(app);
 salesRoutes(app);
 workflowRoutes(app);
 financeRoutes(app);
+reportRoutes(app);
 const errors: ErrorRequestHandler = (error, _req, res, _next) => {
   res
     .status(
@@ -1927,5 +1929,187 @@ describe('retired hold migration with existing records', () => {
     expect((await db.booking.findUniqueOrThrow({ where: { id: bookingId } })).reservationId).toBe(
       booking.reservationId,
     );
+  });
+});
+
+describe('integrated supplier, expense and partner accounting', () => {
+  it('keeps purchase settlement, property costs and partner capital distinct', async () => {
+    const projectResponse = await post('/projects').send({
+      name: 'Accounting completion ' + randomUUID().slice(0, 8),
+      location: 'Lahore',
+    });
+    expect(projectResponse.status, projectResponse.text).toBe(201);
+    const pid = projectResponse.body.data.id as string;
+    const base = `/projects/${pid}`;
+    const today = new Date().toISOString();
+    const date = today.slice(0, 10);
+    const setting = await db.projectSetting.findUniqueOrThrow({
+      where: { projectId_key: { projectId: pid, key: 'accounting' } },
+    });
+    const cashId = (setting.value as Record<string, string>).cash!;
+    const unit = await db.unit.create({
+      data: {
+        projectId: pid,
+        number: 'PROPERTY-A',
+        type: 'HOUSE',
+        size: '1',
+        measurementUnit: 'unit',
+        price: '40000000',
+        features: [],
+      },
+    });
+    const vendorResponse = await post(base + '/vendors').send({
+      name: 'Hamza ' + randomUUID().slice(0, 8),
+      phone: '03001234567',
+      category: 'MULTI_ROLE',
+    });
+    expect(vendorResponse.status, vendorResponse.text).toBe(200);
+    const vendorId = vendorResponse.body.data.id as string;
+    const purchaseResponse = await post(base + '/property-purchases').send({
+      unitId: unit.id,
+      vendorId,
+      title: 'Property A',
+      location: 'Lahore',
+      purchaseDate: date,
+      price: '30000000.00',
+      fileReference: 'HAMZA-' + randomUUID().slice(0, 8),
+    });
+    expect(purchaseResponse.status, purchaseResponse.text).toBe(201);
+    const purchase = purchaseResponse.body.data;
+    const postedPurchase = await post(base + `/property-purchases/${purchase.id}/post`).send({
+      expectedTotal: purchase.total,
+      expectedUpdatedAt: purchase.updatedAt,
+    });
+    expect(postedPurchase.status, postedPurchase.text).toBe(200);
+
+    const supplierPayment = await post(base + '/supplier-payments').send({
+      vendorId,
+      purchaseId: purchase.id,
+      paymentAccountId: cashId,
+      amount: '10000000.00',
+      paidAt: today,
+      method: 'BANK_TRANSFER',
+      transactionReference: 'BANK-' + randomUUID().slice(0, 8),
+    });
+    expect(supplierPayment.status, supplierPayment.text).toBe(201);
+    const supplierStatement = await get(base + `/vendors/${vendorId}/statement`);
+    expect(supplierStatement.status, supplierStatement.text).toBe(200);
+    expect(supplierStatement.body.data.summary).toMatchObject({
+      purchaseAmount: '30000000.00',
+      allocatedPayments: '10000000.00',
+      outstanding: '20000000.00',
+    });
+
+    const workInProgress = await post(base + '/accounts').send({
+      code: 'WIP-' + randomUUID().slice(0, 6),
+      name: 'Property construction WIP ' + randomUUID().slice(0, 6),
+      type: 'ASSET',
+      category: 'PURCHASE',
+    });
+    expect(workInProgress.status, workInProgress.text).toBe(200);
+    const officeExpense = await post(base + '/accounts').send({
+      code: 'EXP-' + randomUUID().slice(0, 6),
+      name: 'Office electricity ' + randomUUID().slice(0, 6),
+      type: 'EXPENSE',
+      category: 'INDIRECT_EXPENSE',
+    });
+    expect(officeExpense.status, officeExpense.text).toBe(200);
+    const construction = await post(base + '/expenses').send({
+      purchaseId: purchase.id,
+      unitId: unit.id,
+      vendorId,
+      expenseAccountId: workInProgress.body.data.id,
+      paymentAccountId: cashId,
+      category: 'Construction',
+      treatment: 'CAPITALIZED',
+      description: 'Construction work on Property A',
+      amount: '500000.00',
+      incurredAt: today,
+      method: 'BANK_TRANSFER',
+      transactionReference: 'BUILD-' + randomUUID().slice(0, 8),
+    });
+    expect(construction.status, construction.text).toBe(201);
+    const generalExpense = await post(base + '/expenses').send({
+      expenseAccountId: officeExpense.body.data.id,
+      paymentAccountId: cashId,
+      category: 'Utilities',
+      treatment: 'OPERATING',
+      description: 'Office electricity bill',
+      amount: '15000.00',
+      incurredAt: today,
+      method: 'CASH',
+    });
+    expect(generalExpense.status, generalExpense.text).toBe(201);
+    expect(generalExpense.body.data.unitId).toBeNull();
+    const unchangedStatement = await get(base + `/vendors/${vendorId}/statement`);
+    expect(unchangedStatement.body.data.summary.outstanding).toBe('20000000.00');
+
+    const partner = await post(base + '/partners').send({ name: 'Partner One' });
+    expect(partner.status, partner.text).toBe(201);
+    const capital = await post(base + '/capital-transactions').send({
+      partnerId: partner.body.data.id,
+      cashAccountId: cashId,
+      kind: 'CONTRIBUTION',
+      amount: '2500000.00',
+      transactedAt: today,
+      description: 'Initial partner contribution',
+    });
+    expect(capital.status, capital.text).toBe(201);
+    const partners = await get(base + '/partners');
+    expect(partners.status, partners.text).toBe(200);
+    expect(
+      partners.body.data.find((item: { id: string }) => item.id === partner.body.data.id).balance,
+    ).toBe('2500000.00');
+
+    const summary = await get(base + `/units/${unit.id}/financial-summary`);
+    expect(summary.status, summary.text).toBe(200);
+    expect(summary.body.data.purchase).toMatchObject({
+      purchasePrice: '30000000.00',
+      paidToSupplier: '10000000.00',
+      supplierOutstanding: '20000000.00',
+    });
+    expect(summary.body.data.expenses).toMatchObject({
+      operating: '0.00',
+      capitalized: '500000.00',
+    });
+
+    const requiredReports = [
+      'sales-payment-report',
+      'product-sales-report',
+      'sales-by-clients-top-5',
+      'sales-by-products-top-5',
+      'sale-order-report',
+      'invoice-aging-sales',
+      'detailed-sales-report',
+      'sales-return-report',
+      'product-purchase-report',
+      'purchase-report',
+      'invoice-aging-purchase',
+      'purchase-order-report',
+      'detailed-purchase-report',
+      'purchase-return-report',
+      'pnl-cogs-periodic',
+      'pnl-stock-change-periodic',
+      'pnl-cogs',
+      'pnl-opening-closing-stock',
+      'productwise-profit-loss',
+      'invoicewise-profit-loss',
+      'clientwise-profit-loss',
+      'balance-sheet',
+      'trial-balance',
+      'expense-report',
+      'detailed-expense-report',
+      'inventory-report',
+      'inventory-valuation-fifo',
+      'day-book',
+      'cash-flow',
+      'tax-report',
+    ];
+    expect(requiredReports).toHaveLength(30);
+    for (const kind of requiredReports) {
+      const report = await get(base + `/reports?kind=${kind}`);
+      expect(report.status, `${kind}: ${report.text}`).toBe(200);
+      expect(Array.isArray(report.body.data.rows)).toBe(true);
+    }
   });
 });

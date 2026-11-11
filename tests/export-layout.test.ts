@@ -4,7 +4,12 @@ import { inflateSync } from 'node:zlib';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pdfBuffer } from '../src/jobs/report-pdf.js';
 import { reportWorkbook } from '../src/jobs/report-xlsx.js';
-import { excelNumber } from '../src/jobs/export-format.js';
+import {
+  excelNumber,
+  exportColumns,
+  exportFilterEntries,
+  exportReportTitle,
+} from '../src/jobs/export-format.js';
 import { statementPdf } from '../src/jobs/statement-pdf.js';
 import type { AccountStatement } from '../src/modules/reports/statement-format.js';
 
@@ -85,6 +90,56 @@ function pdfText(bytes: Buffer) {
 }
 
 describe('light export layouts', () => {
+  it('omits internal UUID identifiers and completely empty columns from public exports', async () => {
+    const identifiers = {
+      id: '2e76dc1b-7c21-4596-97f4-2004ff95da40',
+      projectId: '154e0343-12c1-4bf2-a449-5d33ab5259b2',
+      photoId: '39516548-14c3-47a3-bf03-1f835ce6f795',
+    };
+    const publicRows = [
+      {
+        ...identifiers,
+        typeDetails: null,
+        number: '116-A',
+        type: 'RESIDENTIAL_PLOT',
+        status: 'AVAILABLE',
+      },
+    ];
+
+    expect(exportColumns(publicRows).map((column) => column.key)).toEqual([
+      'number',
+      'type',
+      'status',
+    ]);
+    expect(
+      exportFilterEntries({
+        kind: 'inventory-report',
+        projectId: identifiers.projectId,
+        from: '2026-11-11',
+      }),
+    ).toEqual([['from', '2026-11-11']]);
+    expect(exportReportTitle('inventory-report')).toBe('Inventory report');
+    expect(exportReportTitle('trial-balance')).toBe('Trial balance report');
+
+    const workbook = reportWorkbook({
+      title: 'Inventory report',
+      projectName: branding.name,
+      ...metadata,
+      rows: publicRows,
+    });
+    const sheet = workbook.worksheets[0]!;
+    expect([1, 2, 3].map((column) => sheet.getRow(7).getCell(column).value)).toEqual([
+      'Number',
+      'Type',
+      'Status',
+    ]);
+    expect([1, 2, 3].map((column) => sheet.getRow(8).getCell(column).value)).toEqual([
+      '116-A',
+      'RESIDENTIAL_PLOT',
+      'Available',
+    ]);
+  });
+
   it('keeps native Excel values, safe precision, filters, wrapping and printable headers after reopening', async () => {
     await mkdir(directory, { recursive: true });
     const workbook = reportWorkbook({

@@ -19,6 +19,8 @@ In the **backend GitHub repository**, create the `production` environment and co
 
 The optional environment/repository variable `VPS_PORT` defaults to `22`. Frontend repository secrets are not automatically available to the backend repository. Restrict the production environment to the `main` branch. Existing environment approval rules still apply.
 
+Enter only the IP address or hostname in `VPS_HOST` (no `https://`, `user@`, or `:port`) and only the account name in `VPS_USER` (for example, `root`). The workflow trims surrounding whitespace and identifies invalid settings by name without printing their values. `VPS_PORT` must be between `1` and `65535`.
+
 The deployment account needs Docker access and write access to `/var/www/PMS-BE/.deploy`. The VPS needs Bash, `rsync`, `flock`, and Docker Compose with `--wait` support. The current `/var/www/PMS-BE/.env`, `compose.yaml`, `uploads/`, and running `pms` PostgreSQL, Redis, mail, API and worker services must already exist. Deployment fails before stopping the application when those prerequisites or database/Redis health checks fail. It does not create another infrastructure stack or change Nginx.
 
 The pipeline loads the image built by GitHub and supplies its immutable revision tag through a Compose override. It preserves the existing Compose configuration, environment, upload bind mount and database volumes. The host's old source checkout is no longer a deployment input; it need not contain newly added source files. Do not rebuild that old checkout to release changes. The compiled code in the deployed image comes from the checked-out pipeline revision.

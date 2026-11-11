@@ -7,6 +7,34 @@ import { dashboard, report, reportQuery, queueExport, dealsProfitability } from 
 import { signedDownload } from '../../integrations/storage.js';
 import { calendarRoutes } from './calendar.js';
 const root = '/projects/:projectId';
+const financialReports = new Set([
+  'ledger',
+  'vendor-ledger',
+  'cash-book',
+  'bank-book',
+  'trial-balance',
+  'income-statement',
+  'balance-sheet',
+  'product-purchase-report',
+  'purchase-report',
+  'invoice-aging-purchase',
+  'purchase-order-report',
+  'detailed-purchase-report',
+  'purchase-return-report',
+  'pnl-cogs-periodic',
+  'pnl-stock-change-periodic',
+  'pnl-cogs',
+  'pnl-opening-closing-stock',
+  'productwise-profit-loss',
+  'invoicewise-profit-loss',
+  'clientwise-profit-loss',
+  'expense-report',
+  'detailed-expense-report',
+  'inventory-valuation-fifo',
+  'day-book',
+  'cash-flow',
+  'tax-report',
+]);
 export function reportRoutes(app: Express) {
   calendarRoutes(app);
   endpoint(
@@ -40,17 +68,7 @@ export function reportRoutes(app: Express) {
       query: reportQuery,
     },
     async (ctx, _b, q) => {
-      if (
-        [
-          'ledger',
-          'vendor-ledger',
-          'cash-book',
-          'bank-book',
-          'trial-balance',
-          'income-statement',
-          'balance-sheet',
-        ].includes(q.kind)
-      )
+      if (financialReports.has(q.kind))
         requireState(
           ctx.actor.permissions.has('finance.read'),
           'FORBIDDEN',
@@ -71,17 +89,7 @@ export function reportRoutes(app: Express) {
       status: 202,
     },
     async (ctx, b) => {
-      if (
-        [
-          'ledger',
-          'vendor-ledger',
-          'cash-book',
-          'bank-book',
-          'trial-balance',
-          'income-statement',
-          'balance-sheet',
-        ].includes(b.report.kind)
-      )
+      if (financialReports.has(b.report.kind))
         requireState(
           ctx.actor.permissions.has('finance.read'),
           'FORBIDDEN',
@@ -116,17 +124,7 @@ export function reportRoutes(app: Express) {
       );
       if (job.kind === 'REPORT') {
         const input = z.object({ report: reportQuery }).parse(job.payload);
-        if (
-          [
-            'ledger',
-            'vendor-ledger',
-            'cash-book',
-            'bank-book',
-            'trial-balance',
-            'income-statement',
-            'balance-sheet',
-          ].includes(input.report.kind)
-        )
+        if (financialReports.has(input.report.kind))
           requireState(
             ctx.actor.permissions.has('finance.read'),
             'FORBIDDEN',

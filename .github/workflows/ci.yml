@@ -156,9 +156,31 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ vars.VPS_PORT || '22' }}
         run: |
-          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
-          [[ "$VPS_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
-          [[ "$VPS_PORT" =~ ^[0-9]+$ ]]
+          trim() {
+            local value="$1"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            printf '%s' "$value"
+          }
+          VPS_HOST=$(trim "${VPS_HOST:-}")
+          VPS_USER=$(trim "${VPS_USER:-}")
+          VPS_PORT=$(trim "${VPS_PORT:-}")
+          if [[ ! "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]; then
+            echo '::error::VPS_HOST is missing or invalid. Enter only the VPS IP address or hostname, without https://, a username, a port, or internal spaces.'
+            exit 1
+          fi
+          if [[ ! "$VPS_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]; then
+            echo '::error::VPS_USER is missing or invalid. Enter only the SSH account name, for example root, without @host or a terminal prompt.'
+            exit 1
+          fi
+          if [[ ! "$VPS_PORT" =~ ^[0-9]{1,5}$ ]] || (( 10#$VPS_PORT < 1 || 10#$VPS_PORT > 65535 )); then
+            echo '::error::VPS_PORT must be a number from 1 to 65535. Set it as a production variable, or leave it unset to use 22.'
+            exit 1
+          fi
+          VPS_PORT=$((10#$VPS_PORT))
+          echo "::add-mask::$VPS_HOST"
+          echo "::add-mask::$VPS_USER"
+          echo 'SSH host, user and port settings validated. Connecting to the VPS.'
           target="$VPS_USER@$VPS_HOST"
           release="/var/www/PMS-BE/.deploy/releases/$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           ssh_options=(-p "$VPS_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)

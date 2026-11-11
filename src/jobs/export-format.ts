@@ -22,6 +22,30 @@ export type ExportColumn = {
   width: number;
 };
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Internal database identifiers are useful to the API, but not to report readers. */
+export function isInternalIdentifierKey(key: string) {
+  return (
+    key === 'id' || key === 'ID' || key.endsWith('Id') || key.endsWith('Ids') || /_ids?$/i.test(key)
+  );
+}
+
+function isUuid(value: unknown) {
+  return typeof value === 'string' && uuidPattern.test(value);
+}
+
+export function exportFilterEntries(filters: Record<string, unknown> = {}) {
+  return Object.entries(filters).filter(
+    ([key, value]) =>
+      key !== 'kind' &&
+      value != null &&
+      value !== '' &&
+      !isInternalIdentifierKey(key) &&
+      !isUuid(value),
+  );
+}
+
 export function exportLabel(value: string) {
   return value
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -30,32 +54,47 @@ export function exportLabel(value: string) {
     .replace(/^./, (s) => s.toUpperCase());
 }
 
+export function exportReportTitle(kind: string) {
+  const label = exportLabel(kind);
+  return /\breport$/i.test(label) ? label : `${label} report`;
+}
+
 export function exportColumns(rows: ReportRow[]): ExportColumn[] {
-  return [...new Set(rows.flatMap((row) => Object.keys(row)))].map((key) => {
-    const values = rows.map((row) => row[key]).filter((value) => value != null && value !== '');
-    const type = monetaryKeys.test(key)
-      ? 'money'
-      : /percent|marginPercent$/i.test(key)
-        ? 'percent'
-        : /At$|Date$|^date$/i.test(key)
-          ? 'date'
-          : values.length && values.every((value) => typeof value === 'number')
-            ? 'number'
-            : 'text';
-    const width =
-      type === 'money'
-        ? 23
-        : type === 'date'
-          ? 18
-          : type === 'number' || type === 'percent'
-            ? 16
-            : /description|title|name|reference/i.test(key)
-              ? 32
-              : /Id$|^id$/.test(key)
-                ? 38
-                : 22;
-    return { key, label: exportLabel(key), type, width };
-  });
+  return [...new Set(rows.flatMap((row) => Object.keys(row)))]
+    .map((key) => ({
+      key,
+      values: rows.map((row) => row[key]).filter((value) => value != null && value !== ''),
+    }))
+    .filter(
+      ({ key, values }) =>
+        values.length > 0 &&
+        !isInternalIdentifierKey(key) &&
+        !values.every((value) => isUuid(value)),
+    )
+    .map(({ key, values }) => {
+      const type = monetaryKeys.test(key)
+        ? 'money'
+        : /percent|marginPercent$/i.test(key)
+          ? 'percent'
+          : /At$|Date$|^date$/i.test(key)
+            ? 'date'
+            : values.length && values.every((value) => typeof value === 'number')
+              ? 'number'
+              : 'text';
+      const width =
+        type === 'money'
+          ? 23
+          : type === 'date'
+            ? 18
+            : type === 'number' || type === 'percent'
+              ? 16
+              : /description|title|name|reference/i.test(key)
+                ? 32
+                : /Id$|^id$/.test(key)
+                  ? 38
+                  : 22;
+      return { key, label: exportLabel(key), type, width };
+    });
 }
 
 export function exportMoney(value: unknown) {

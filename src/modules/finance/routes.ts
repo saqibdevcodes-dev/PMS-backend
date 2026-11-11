@@ -17,6 +17,49 @@ import { found, requireState } from '../../common/errors.js';
 import { audit } from '../../common/operations.js';
 import { postJournal, reverseJournal } from './service.js';
 import { purchaseRoutes } from './purchases.js';
+import { accountingCompletionRoutes } from './accounting.js';
+const accountCategory = z.enum([
+  'SALES',
+  'PURCHASE',
+  'EXPENSE',
+  'INDIRECT_EXPENSE',
+  'CAPITAL',
+  'SUPPLIER',
+  'CUSTOMER',
+  'ASSET',
+  'LIABILITY',
+  'OTHER',
+]);
+const accountBody = z
+  .object({
+    code: z.string().trim().min(1).max(20),
+    name: z.string().trim().min(2).max(200),
+    type: z.enum(AccountType),
+    category: accountCategory.default('OTHER'),
+    parentId: uuid.nullable().optional(),
+    active: z.boolean().default(true),
+  })
+  .strict();
+const categoryTypes: Record<z.infer<typeof accountCategory>, AccountType[]> = {
+  SALES: ['REVENUE'],
+  PURCHASE: ['ASSET', 'EXPENSE'],
+  EXPENSE: ['EXPENSE'],
+  INDIRECT_EXPENSE: ['EXPENSE'],
+  CAPITAL: ['EQUITY'],
+  SUPPLIER: ['LIABILITY'],
+  CUSTOMER: ['ASSET', 'LIABILITY'],
+  ASSET: ['ASSET'],
+  LIABILITY: ['LIABILITY'],
+  OTHER: ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'],
+};
+function requireCategoryType(category: z.infer<typeof accountCategory>, type: AccountType) {
+  requireState(
+    categoryTypes[category].includes(type),
+    'ACCOUNT_CATEGORY_TYPE_MISMATCH',
+    `${category.replaceAll('_', ' ')} is not valid for a ${type} account.`,
+    422,
+  );
+}
 const vendorBody = z
   .object({
     name: z.string().trim().min(2).max(200),
@@ -43,13 +86,24 @@ const journalBody = z
   .strict();
 export function financeRoutes(app: Express) {
   purchaseRoutes(app);
+  accountingCompletionRoutes(app);
   endpoint(
     app,
     'get',
     root + '/accounts',
-    { permission: 'finance.read', summary: 'List chart of accounts' },
-    async (ctx) =>
-      db.account.findMany({ where: { projectId: ctx.projectId }, orderBy: { code: 'asc' } }),
+    {
+      permission: 'finance.read',
+      summary: 'List chart of accounts',
+      query: z
+        .object({ type: z.enum(AccountType).optional(), category: accountCategory.optional() })
+        .strict(),
+    },
+    async (ctx, _body, query) =>
+      db.account.findMany({
+        where: { projectId: ctx.projectId, type: query.type, category: query.category },
+        include: { parent: { select: { id: true, code: true, name: true } } },
+        orderBy: { code: 'asc' },
+      }),
   );
   endpoint(
     app,
@@ -58,18 +112,98 @@ export function financeRoutes(app: Express) {
     {
       permission: 'finance.post',
       summary: 'Add chart of account entry',
-      body: z
-        .object({
-          code: z.string().min(1).max(20),
-          name: z.string().min(2).max(200),
-          type: z.enum(AccountType),
-        })
-        .strict(),
+      body: accountBody,
     },
     async (ctx, b) =>
       transaction(async (tx) => {
+        requireCategoryType(b.category, b.type);
+        if (b.parentId)
+          found(
+            await tx.account.findFirst({
+              where: { id: b.parentId, projectId: ctx.projectId, type: b.type },
+            }),
+            'The parent account must belong to this project and use the same account type.',
+          );
+        requireState(
+          !(await tx.account.findFirst({
+            where: {
+              projectId: ctx.projectId,
+              name: { equals: b.name, mode: 'insensitive' },
+            },
+          })),
+          'DUPLICATE_ACCOUNT',
+          'An account with this name already exists.',
+          409,
+        );
         const account = await tx.account.create({ data: { ...b, projectId: ctx.projectId } });
         await audit(tx, ctx, 'account.created', account.id);
+        return account;
+      }),
+  );
+  endpoint(
+    app,
+    'patch',
+    root + '/accounts/:id',
+    {
+      permission: 'finance.post',
+      summary: 'Update chart of account classification, hierarchy or active state',
+      body: accountBody,
+    },
+    async (ctx, b, _q, req) =>
+      transaction(async (tx) => {
+        const current = found(
+          await tx.account.findFirst({ where: { id: id(req), projectId: ctx.projectId } }),
+        );
+        requireCategoryType(b.category, b.type);
+        requireState(
+          b.parentId !== current.id,
+          'ACCOUNT_SELF_PARENT',
+          'An account cannot parent itself.',
+        );
+        if (b.parentId)
+          found(
+            await tx.account.findFirst({
+              where: { id: b.parentId, projectId: ctx.projectId, type: b.type },
+            }),
+            'The parent account must belong to this project and use the same account type.',
+          );
+        let ancestorId = b.parentId ?? null;
+        while (ancestorId) {
+          requireState(
+            ancestorId !== current.id,
+            'ACCOUNT_HIERARCHY_CYCLE',
+            'This parent would create a cycle in the account hierarchy.',
+            422,
+          );
+          ancestorId =
+            (
+              await tx.account.findFirst({
+                where: { id: ancestorId, projectId: ctx.projectId },
+                select: { parentId: true },
+              })
+            )?.parentId ?? null;
+        }
+        requireState(
+          !(await tx.account.findFirst({
+            where: {
+              projectId: ctx.projectId,
+              id: { not: current.id },
+              name: { equals: b.name, mode: 'insensitive' },
+            },
+          })),
+          'DUPLICATE_ACCOUNT',
+          'An account with this name already exists.',
+          409,
+        );
+        requireState(
+          current.type === b.type ||
+            !(await tx.journalLine.count({ where: { accountId: current.id } })),
+          'ACCOUNT_TYPE_IN_USE',
+          'An account with posted ledger activity cannot change type.',
+          422,
+        );
+        const account = await tx.account.update({ where: { id: current.id }, data: b });
+        await audit(tx, ctx, 'account.updated', account.id);
         return account;
       }),
   );
@@ -353,14 +487,18 @@ export function financeRoutes(app: Express) {
       summary: 'List project vendors',
       query: paginationQuery.extend({
         search: z.string().max(200).optional(),
-        role: z.enum(['SELLER']).optional(),
+        role: z.enum(['SELLER', 'SUPPLIER', 'CONTRACTOR', 'MULTI_ROLE']).optional(),
       }),
     },
     async (ctx, _b, q) => {
       const where = {
         projectId: ctx.projectId,
         ...(q.search ? { name: { contains: q.search, mode: 'insensitive' as const } } : {}),
-        ...(q.role === 'SELLER' ? { category: { in: ['SELLER', 'MULTI_ROLE'] } } : {}),
+        ...(q.role
+          ? q.role === 'MULTI_ROLE'
+            ? { category: 'MULTI_ROLE' }
+            : { category: { in: [q.role, 'MULTI_ROLE'] } }
+          : {}),
       };
       const [items, total] = await Promise.all([
         db.vendor.findMany({

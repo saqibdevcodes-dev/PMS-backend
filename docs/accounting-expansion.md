@@ -27,15 +27,23 @@ Reserved accounts are created in the selected project on first posting:
 | SYS-SELLER-PAYABLES      | Liability | Agreed property price owed to sellers       |
 | SYS-ACQUISITION-ACCRUALS | Liability | Additional direct acquisition costs payable |
 
-## Next implementation stages
+## Accounting completion delivered on 11 November 2026
 
-1. **Bills, expenses and payments:** expense categories, supplier bills with due dates and documents, allocation against existing acquisition accruals, cash/bank payment vouchers, cheque clearing, partial settlements, reversals, approval controls and payable ageing.
-2. **Capital and commissions:** partner contributions/drawings, financing, reinstated dealer management and commission calculation/approval/payment. Keep buyer receipts separate from capital and revenue.
-3. **Construction costing:** project → acquired property/site → building/house → floor → unit; work categories, budgets, estimates, purchase orders, material receipts/issues, labour and contractor bills, retention and cost allocation. Report budget, committed, incurred and paid amounts separately.
-4. **Assets and financial completion:** fixed-asset register, depreciation/disposals, appropriate classification of investment properties, sale-linked revenue and cost recognition, inventory valuation, reconciliation and period closing.
-5. **Dashboard and reports:** buyers/sellers, available/reserved/sold/remaining plots, receivable/payable ageing, purchase and construction profitability, capital and asset summaries, cash flow, trial balance, balance sheet and profit and loss. Profit and loss and income statement are two names for the same core report; do not build conflicting versions.
+- Chart-of-account categories and parent/child accounts now distinguish sales, purchases, direct and indirect expenses, capital, supplier, customer, asset, liability and other accounts while retaining the unified ledger.
+- Supplier payment vouchers support purchase allocation, partial settlement, exact outstanding purchase balances, immutable journals and reversal without treating the payment as a property expense.
+- Expenses have a direct navigation entry and can be posted without a property. An optional property/purchase link adds the item to the property financial summary. Every expense explicitly chooses operating-expense or capitalized-cost treatment and an account of the matching type.
+- Partners receive dedicated equity accounts automatically. Contributions and withdrawals post through balanced, reversible capital vouchers and partner balances remain separate.
+- Supplier statements and property financial summaries expose purchase price, acquisition cost, allocated supplier payments, supplier payable, operating costs, capitalized costs, customer receipts and sale receivables separately.
+- The reporting center includes the requested 30 sales, purchase, profit/loss, balance-sheet and other financial report entries, in addition to the existing operational reports and ledgers. Every report reads stored transactions.
 
-Existing buyers, bookings, installments, customer receipts, property availability, journal ledger and base financial reports remain in place. The new purchase postings feed the ledger, but this does not make the wider accounting expansion complete.
+The current domain models uniquely identified real-estate properties rather than generic stock-keeping units. Product reports therefore group by property type, and FIFO output preserves specific property cost in acquisition order instead of inventing pooled FIFO layers. Draft bookings/purchases provide sale/purchase order views; completed cancellations and voided purchases provide return views. Tax reporting currently exposes stored non-recoverable acquisition taxes and explicitly states that sales-tax and withholding workflows require future configured tax fields and rules.
+
+## Remaining specialist accounting stages
+
+1. **Supplier bill controls:** due dates independent of the acquisition date, document matching, cheque-clearing states, approval thresholds, purchase credits and formal supplier-return documents. Current partial payments and payable ageing operate against posted property purchases.
+2. **Construction operations:** budgets, estimates, purchase orders, material receipts/issues, labour certification, retention and committed-versus-incurred reporting. Current construction costs can be capitalized to a property but do not form a quantity-surveying subsystem.
+3. **Tax configuration:** project-specific sales tax, withholding, exemptions, rates and filing periods. The report does not infer jurisdictional tax rules.
+4. **Assets and recognition policy:** fixed-asset depreciation/disposals, investment-property measurement and automated sale-linked revenue/cost recognition. Existing ledger postings remain policy-controlled and auditable.
 
 ## Rollout
 

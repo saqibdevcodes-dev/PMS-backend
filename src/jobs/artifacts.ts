@@ -8,7 +8,7 @@ import { statementPdf } from './statement-pdf.js';
 import { projectBranding } from './project-branding.js';
 import { pdfBuffer } from './report-pdf.js';
 import { reportWorkbook } from './report-xlsx.js';
-import { exportLabel } from './export-format.js';
+import { exportReportTitle } from './export-format.js';
 export { pdfBuffer } from './report-pdf.js';
 export async function generateArtifact(jobId: string) {
   const job = found(await db.backgroundJob.findUnique({ where: { id: jobId } }));
@@ -70,10 +70,11 @@ export async function generateArtifact(jobId: string) {
         .object({ report: reportQuery, format: z.enum(['xlsx', 'pdf']) })
         .parse(job.payload);
       const result = await report(job.projectId, input.report, 50000);
+      const title = exportReportTitle(input.report.kind);
       extension = input.format;
       if (input.format === 'xlsx') {
         const workbook = reportWorkbook({
-          title: exportLabel(input.report.kind) + ' report',
+          title,
           projectName: branding.name,
           currency: result.currency,
           timezone: branding.timezone,
@@ -89,7 +90,7 @@ export async function generateArtifact(jobId: string) {
         body =
           'statement' in result && result.statement
             ? await statementPdf(result.statement, branding)
-            : await pdfBuffer(exportLabel(input.report.kind) + ' report', result.rows, branding, {
+            : await pdfBuffer(title, result.rows, branding, {
                 currency: result.currency,
                 timezone: branding.timezone,
                 filters: input.report,

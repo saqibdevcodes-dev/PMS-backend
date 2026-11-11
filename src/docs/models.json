@@ -808,6 +808,34 @@
           "kind": "object",
           "isList": true,
           "isRequired": true
+        },
+        {
+          "name": "expenses",
+          "type": "Expense",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "supplierPayments",
+          "type": "SupplierPayment",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "partners",
+          "type": "Partner",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "capitalTransactions",
+          "type": "CapitalTransaction",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
         }
       ]
     },
@@ -1039,6 +1067,13 @@
         {
           "name": "purchases",
           "type": "PropertyPurchase",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "expenses",
+          "type": "Expense",
           "kind": "object",
           "isList": true,
           "isRequired": true
@@ -3680,6 +3715,20 @@
           "isRequired": true
         },
         {
+          "name": "category",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "parentId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
           "name": "active",
           "type": "Boolean",
           "kind": "scalar",
@@ -3691,6 +3740,20 @@
           "type": "Project",
           "kind": "object",
           "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "parent",
+          "type": "Account",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "children",
+          "type": "Account",
+          "kind": "object",
+          "isList": true,
           "isRequired": true
         },
         {
@@ -3710,6 +3773,41 @@
         {
           "name": "banks",
           "type": "BankAccount",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "expenseAccounts",
+          "type": "Expense",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "expensePaymentAccounts",
+          "type": "Expense",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "supplierPayments",
+          "type": "SupplierPayment",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "partnerCapital",
+          "type": "Partner",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "capitalCashAccounts",
+          "type": "CapitalTransaction",
           "kind": "object",
           "isList": true,
           "isRequired": true
@@ -3783,6 +3881,48 @@
         {
           "name": "reversedPurchase",
           "type": "PropertyPurchase",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "supplierPayment",
+          "type": "SupplierPayment",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "reversedSupplierPayment",
+          "type": "SupplierPayment",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "expense",
+          "type": "Expense",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "reversedExpense",
+          "type": "Expense",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "capitalTransaction",
+          "type": "CapitalTransaction",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "reversedCapitalTransaction",
+          "type": "CapitalTransaction",
           "kind": "object",
           "isList": false,
           "isRequired": false
@@ -4137,6 +4277,20 @@
           "isRequired": true
         },
         {
+          "name": "supplierPayments",
+          "type": "SupplierPayment",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "expenses",
+          "type": "Expense",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
           "name": "id",
           "type": "String",
           "kind": "scalar",
@@ -4399,6 +4553,600 @@
           "kind": "object",
           "isList": false,
           "isRequired": false
+        },
+        {
+          "name": "reversal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "payments",
+          "type": "SupplierPayment",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "expenses",
+          "type": "Expense",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "SupplierPayment",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "vendorId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "purchaseId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "paymentAccountId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paidAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "method",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "transactionReference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "notes",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reversalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "vendor",
+          "type": "Vendor",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "purchase",
+          "type": "PropertyPurchase",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "paymentAccount",
+          "type": "Account",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reversal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        }
+      ]
+    },
+    {
+      "name": "Expense",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "purchaseId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "unitId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "vendorId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "expenseAccountId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paymentAccountId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "category",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "treatment",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "incurredAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "method",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "transactionReference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reversalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "purchase",
+          "type": "PropertyPurchase",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "unit",
+          "type": "Unit",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "vendor",
+          "type": "Vendor",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "expenseAccount",
+          "type": "Account",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "paymentAccount",
+          "type": "Account",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reversal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        }
+      ]
+    },
+    {
+      "name": "Partner",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "phone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "active",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "capitalAccountId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "capitalAccount",
+          "type": "Account",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "transactions",
+          "type": "CapitalTransaction",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "CapitalTransaction",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "partnerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "cashAccountId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reference",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "amount",
+          "type": "Decimal",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "transactedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "reversalId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "createdBy",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "project",
+          "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "partner",
+          "type": "Partner",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "cashAccount",
+          "type": "Account",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "journal",
+          "type": "Journal",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
         },
         {
           "name": "reversal",

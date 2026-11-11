@@ -109,16 +109,16 @@ async function validate(tx: Tx, ctx: Context, input: z.infer<typeof body>, curre
 // and customer advances. Existing projects get these when first used.
 async function purchaseAccounts(tx: Tx, projectId: string) {
   const definitions = [
-    ['SYS-PROPERTY-INVENTORY', 'Property acquisition inventory', 'ASSET'],
-    ['SYS-SELLER-PAYABLES', 'Property seller payables', 'LIABILITY'],
-    ['SYS-ACQUISITION-ACCRUALS', 'Other acquisition costs payable', 'LIABILITY'],
+    ['SYS-PROPERTY-INVENTORY', 'Property acquisition inventory', 'ASSET', 'PURCHASE'],
+    ['SYS-SELLER-PAYABLES', 'Property seller payables', 'LIABILITY', 'SUPPLIER'],
+    ['SYS-ACQUISITION-ACCRUALS', 'Other acquisition costs payable', 'LIABILITY', 'SUPPLIER'],
   ] as const;
   const accounts = [];
-  for (const [code, name, type] of definitions) {
+  for (const [code, name, type, category] of definitions) {
     const account = await tx.account.upsert({
       where: { projectId_code: { projectId, code } },
-      create: { projectId, code, name, type },
-      update: {},
+      create: { projectId, code, name, type, category },
+      update: { category },
     });
     requireState(
       account.type === type && account.active,
