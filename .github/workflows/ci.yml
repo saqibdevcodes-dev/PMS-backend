@@ -1,22 +1,9 @@
 name: Backend CI/CD
 
-name: Backend CI/CD
-
 on:
   push:
     branches: [main]
-    branches: [main]
   pull_request:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-defaults:
-  run:
-    shell: bash
-
     branches: [main]
   workflow_dispatch:
 
@@ -30,9 +17,7 @@ defaults:
 jobs:
   validate:
     name: 1. Validate and test
-    name: 1. Validate and test
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -60,42 +45,8 @@ jobs:
         run: npm test
       - name: S3 integration tests
         run: npm run test:integration
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Prepare isolated test services
-        run: |
-          npm run setup:env
-          docker compose --profile s3 up -d --wait postgres redis storage mail
-          npm run db:generate
-          npm run db:migrate
-      - name: Type check
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: Check formatting
-        run: npm run format:check
-      - name: Unit tests
-        run: npm run test:unit
-      - name: Database and workflow tests
-        run: npm test
-      - name: S3 integration tests
-        run: npm run test:integration
         env:
           STORAGE_DRIVER: s3
-      - name: Build and verify generated API contract
-        run: |
-          cp docs/openapi.json "$RUNNER_TEMP/expected-openapi.json"
-          npm run openapi
-          cmp "$RUNNER_TEMP/expected-openapi.json" docs/openapi.json
-      - name: Dependency security audit
-        run: npm audit --audit-level=moderate
-      - name: Validate deployment scripts
-        run: |
-          bash -n deployment/activate-release.sh
-          node --test deployment/verify-release.checks.mjs
-          bash deployment/activate-release.test.sh
-      - name: Remove runner test services
-        if: always()
       - name: Build and verify generated API contract
         run: |
           cp docs/openapi.json "$RUNNER_TEMP/expected-openapi.json"
