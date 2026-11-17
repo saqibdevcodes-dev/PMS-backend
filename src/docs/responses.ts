@@ -34,7 +34,10 @@ export function responseSchema(path: string, method: string, hasPagination: bool
       name: str,
       email: str,
       accountType: { type: 'string', enum: ['STAFF', 'CUSTOMER'] },
-      projects: array(object({ projectId: str })),
+      projects: array(
+        object({ projectId: str, project: object({ companyId: { type: ['string', 'null'] } }) }),
+      ),
+      companies: array(object({ companyId: str, role: str })),
       permissions: array(str),
     });
   if (path.includes('/logout')) return result('loggedOut');
@@ -316,6 +319,8 @@ export function responseSchema(path: string, method: string, hasPagination: bool
       ],
     };
   const resources: Record<string, string> = {
+    companies: 'Company',
+    members: 'CompanyMember',
     users: 'User',
     roles: 'Role',
     projects: 'Project',

@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import { z } from 'zod';
-import { Prisma, UnitStatus } from '@prisma/client';
+import { CompanyMemberRole, Prisma, UnitStatus } from '@prisma/client';
 import { DateTime } from 'luxon';
 import { db, transaction, lock } from '../../database/client.js';
 import { endpoint, pageQuery, pagination, paged, uuid, password, id } from '../../common/http.js';
@@ -11,7 +11,12 @@ import { permissions } from '../../common/permissions.js';
 import { identityHash, encrypt, decrypt } from '../../common/security.js';
 import { passwordHash, verifyUserPassword } from '../auth/service.js';
 import { deleteBookingInTransaction } from '../sales/service.js';
-import { requireImage, requireGalleryImages, requireUnitImages } from '../images/service.js';
+import {
+  requireCompanyLogo,
+  requireImage,
+  requireGalleryImages,
+  requireUnitImages,
+} from '../images/service.js';
 import { defaultAccounts } from '../finance/service.js';
 import { scopedUnit, unitState } from '../inventory/service.js';
 import { emailUser, welcomeUser, webLink } from '../../common/notifications.js';
@@ -28,7 +33,6 @@ const projectBody = z
   .object({
     name: z.string().min(2).max(200),
     location: z.string().trim().min(2).max(300),
-    logoId: uuid.nullable().optional(),
     description: z.string().max(4000).default(''),
     features: z.array(z.string().min(1).max(100)).max(30).default([]),
     featureImages: z
@@ -46,6 +50,20 @@ const projectBody = z
       .refine((v) => DateTime.now().setZone(v).isValid)
       .default('Asia/Karachi'),
     ndcValidityDays: z.number().int().min(1).max(365).default(30),
+  })
+  .strict();
+const companyBody = z
+  .object({
+    name: z.string().trim().min(2).max(200),
+    logoId: uuid.nullable().optional(),
+    address: z.string().trim().max(500).default(''),
+    phone: z.string().trim().max(30).default(''),
+    email: z
+      .preprocess(
+        (value) => (value === '' ? '' : value),
+        z.union([z.literal(''), z.email().toLowerCase()]),
+      )
+      .default(''),
   })
   .strict();
 const unitFields = z
@@ -142,11 +160,203 @@ export function foundationRoutes(app: Express) {
   endpoint(
     app,
     'get',
+    '/companies',
+    {
+      permission: 'projects.read',
+      summary: 'List companies assigned to the current user',
+      query: pageQuery,
+    },
+    async (ctx, _b, q) => {
+      const where: Prisma.CompanyWhereInput = {
+        active: true,
+        members: { some: { userId: ctx.actor.id } },
+        ...(q.search ? { name: { contains: q.search, mode: 'insensitive' } } : {}),
+      };
+      const [items, total] = await Promise.all([
+        db.company.findMany({
+          where,
+          ...pagination(q),
+          include: {
+            members: { where: { userId: ctx.actor.id }, select: { role: true } },
+            _count: { select: { projects: true, members: true } },
+          },
+          orderBy: { createdAt: q.sort },
+        }),
+        db.company.count({ where }),
+      ]);
+      return paged(
+        items.map(({ members, ...company }) => ({
+          ...company,
+          role: members[0]?.role ?? 'MEMBER',
+        })),
+        total,
+        q,
+      );
+    },
+  );
+  endpoint(
+    app,
+    'post',
+    '/companies',
+    {
+      permission: 'projects.create',
+      summary: 'Create a company and make the current user its owner',
+      body: companyBody,
+      status: 201,
+    },
+    async (ctx, body) =>
+      transaction(async (tx) => {
+        await requireCompanyLogo(tx, ctx, body.logoId);
+        let code: string;
+        do {
+          code = await reference(tx, 'CMP');
+        } while (await tx.company.findUnique({ where: { code } }));
+        const company = await tx.company.create({
+          data: {
+            ...body,
+            code,
+            members: { create: { userId: ctx.actor.id, role: CompanyMemberRole.OWNER } },
+          },
+        });
+        await audit(tx, ctx, 'company.created', company.id);
+        return company;
+      }),
+  );
+  endpoint(
+    app,
+    'get',
+    '/companies/:companyId',
+    { permission: 'projects.read', summary: 'Get company settings and counts' },
+    async (ctx, _b, _q, req) => {
+      const company = found(
+        await db.company.findUnique({
+          where: { id: String(req.params.companyId) },
+          include: {
+            members: { where: { userId: ctx.actor.id }, select: { role: true } },
+            _count: { select: { projects: true, members: true } },
+          },
+        }),
+      );
+      const { members, ...details } = company;
+      return { ...details, role: members[0]?.role ?? CompanyMemberRole.MEMBER };
+    },
+  );
+  endpoint(
+    app,
+    'patch',
+    '/companies/:companyId',
+    {
+      permission: 'projects.update',
+      summary: 'Update company details and branding',
+      body: companyBody.partial(),
+    },
+    async (ctx, body, _q, req) =>
+      transaction(async (tx) => {
+        const membership = found(
+          await tx.companyMember.findUnique({
+            where: {
+              companyId_userId: { companyId: String(req.params.companyId), userId: ctx.actor.id },
+            },
+          }),
+        );
+        requireState(
+          membership.role !== CompanyMemberRole.MEMBER,
+          'FORBIDDEN',
+          'Only company owners and administrators can update company settings.',
+          403,
+        );
+        await requireCompanyLogo(tx, ctx, body.logoId, String(req.params.companyId));
+        const company = await tx.company.update({
+          where: { id: String(req.params.companyId) },
+          data: body,
+        });
+        await audit(tx, ctx, 'company.updated', company.id, body);
+        return company;
+      }),
+  );
+  endpoint(
+    app,
+    'get',
+    '/companies/:companyId/members',
+    { permission: 'users.manage', summary: 'List company members', query: pageQuery },
+    async (_ctx, _b, q, req) => {
+      const where: Prisma.CompanyMemberWhereInput = {
+        companyId: String(req.params.companyId),
+        ...(q.search
+          ? {
+              user: {
+                OR: [
+                  { name: { contains: q.search, mode: 'insensitive' } },
+                  { email: { contains: q.search, mode: 'insensitive' } },
+                ],
+              },
+            }
+          : {}),
+      };
+      const [items, total] = await Promise.all([
+        db.companyMember.findMany({
+          where,
+          ...pagination(q),
+          include: { user: { select: { id: true, name: true, email: true, active: true } } },
+          orderBy: { createdAt: q.sort },
+        }),
+        db.companyMember.count({ where }),
+      ]);
+      return paged(items, total, q);
+    },
+  );
+  endpoint(
+    app,
+    'post',
+    '/companies/:companyId/members',
+    {
+      permission: 'users.manage',
+      summary: 'Add or update a company member',
+      body: z.object({ userId: uuid, role: z.enum(CompanyMemberRole) }).strict(),
+    },
+    async (ctx, body, _q, req) =>
+      transaction(async (tx) => {
+        const actorMembership = found(
+          await tx.companyMember.findUnique({
+            where: {
+              companyId_userId: { companyId: String(req.params.companyId), userId: ctx.actor.id },
+            },
+          }),
+        );
+        requireState(
+          actorMembership.role !== CompanyMemberRole.MEMBER,
+          'FORBIDDEN',
+          'Only company owners and administrators can manage members.',
+          403,
+        );
+        found(await tx.user.findFirst({ where: { id: body.userId, accountType: 'STAFF' } }));
+        const member = await tx.companyMember.upsert({
+          where: {
+            companyId_userId: { companyId: String(req.params.companyId), userId: body.userId },
+          },
+          create: { companyId: String(req.params.companyId), userId: body.userId, role: body.role },
+          update: { role: body.role },
+        });
+        await audit(tx, ctx, 'company.member_updated', body.userId, {
+          companyId: String(req.params.companyId),
+          role: body.role,
+        });
+        return member;
+      }),
+  );
+  endpoint(
+    app,
+    'get',
     '/projects',
-    { permission: 'projects.read', summary: 'List assigned projects', query: pageQuery },
+    {
+      permission: 'projects.read',
+      summary: 'List assigned projects for a company',
+      query: pageQuery.extend({ companyId: uuid.optional() }),
+    },
     async (ctx, _b, q) => {
       const where = {
         access: { some: { userId: ctx.actor.id } },
+        ...(q.companyId ? { companyId: q.companyId } : {}),
         ...(q.search ? { name: { contains: q.search, mode: 'insensitive' as const } } : {}),
       };
       const [items, total] = await Promise.all([
@@ -162,14 +372,46 @@ export function foundationRoutes(app: Express) {
     '/projects',
     {
       permission: 'projects.create',
-      summary: 'Create project, account mappings and membership',
-      body: projectBody,
+      summary: 'Create a project inside a company, account mappings and membership',
+      body: projectBody.extend({ companyId: uuid.optional() }),
       status: 201,
     },
     async (ctx, body) =>
       transaction(async (tx) => {
+        let membership = body.companyId
+          ? await tx.companyMember.findUnique({
+              where: {
+                companyId_userId: { companyId: body.companyId, userId: ctx.actor.id },
+              },
+            })
+          : await tx.companyMember.findFirst({
+              where: { userId: ctx.actor.id, company: { active: true } },
+              orderBy: { createdAt: 'asc' },
+            });
+        if (!membership && !body.companyId) {
+          let companyCode: string;
+          do {
+            companyCode = await reference(tx, 'CMP');
+          } while (await tx.company.findUnique({ where: { code: companyCode } }));
+          const company = await tx.company.create({
+            data: {
+              code: companyCode,
+              name: 'Main Company',
+              members: { create: { userId: ctx.actor.id, role: CompanyMemberRole.OWNER } },
+            },
+          });
+          membership = await tx.companyMember.findUnique({
+            where: { companyId_userId: { companyId: company.id, userId: ctx.actor.id } },
+          });
+        }
+        requireState(
+          membership && membership.role !== CompanyMemberRole.MEMBER,
+          'COMPANY_REQUIRED',
+          'Choose a company where you are an owner or administrator.',
+          422,
+        );
+        const { companyId: _requestedCompanyId, ...projectInput } = body;
         const gallery = await requireGalleryImages(tx, ctx, body, 'PROJECT');
-        await requireImage(tx, ctx, body.logoId, 'PROJECT_LOGO');
         for (const item of body.featureImages) {
           requireState(
             body.features.includes(item.feature),
@@ -184,7 +426,9 @@ export function foundationRoutes(app: Express) {
         do {
           code = await reference(tx, 'PRJ');
         } while (await tx.project.findUnique({ where: { code } }));
-        const project = await tx.project.create({ data: { ...body, ...gallery, code } });
+        const project = await tx.project.create({
+          data: { ...projectInput, ...gallery, code, companyId: membership.companyId },
+        });
         await tx.userProjectAccess.create({
           data: { userId: ctx.actor.id, projectId: project.id },
         });
@@ -227,7 +471,6 @@ export function foundationRoutes(app: Express) {
           );
         }
         const gallery = await requireGalleryImages(tx, ctx, body, 'PROJECT', current);
-        await requireImage(tx, ctx, body.logoId, 'PROJECT_LOGO');
         for (const item of body.featureImages ?? []) {
           requireState(
             (body.features ?? current.features).includes(item.feature),
@@ -254,13 +497,20 @@ export function foundationRoutes(app: Express) {
       const project = found(
         await db.project.findUnique({
           where: { id: ctx.projectId },
-          include: { _count: { select: { units: true, plans: true } } },
+          include: {
+            company: { select: { id: true, name: true, code: true, logoId: true } },
+            _count: { select: { units: true, plans: true } },
+          },
         }),
       );
       const availableProperties = await db.unit.count({
         where: { projectId: ctx.projectId, status: 'AVAILABLE', price: { gt: 0 } },
       });
-      return { ...project, availableProperties };
+      return {
+        ...project,
+        logoId: project.company?.logoId ?? project.logoId,
+        availableProperties,
+      };
     },
   );
   endpoint(
@@ -268,16 +518,36 @@ export function foundationRoutes(app: Express) {
     'get',
     '/projects/:projectId/branding',
     {
-      summary: 'Project branding for documents, restricted to assigned staff',
-      response: z.object({ id: uuid, name: z.string(), logoId: uuid.nullable() }),
+      summary: 'Company branding for a project, restricted to assigned staff',
+      response: z.object({
+        id: uuid,
+        name: z.string(),
+        companyId: uuid.nullable(),
+        companyName: z.string(),
+        logoId: uuid.nullable(),
+      }),
     },
-    async (ctx) =>
-      found(
+    async (ctx) => {
+      const project = found(
         await db.project.findUnique({
           where: { id: ctx.projectId },
-          select: { id: true, name: true, logoId: true },
+          select: {
+            id: true,
+            name: true,
+            logoId: true,
+            companyId: true,
+            company: { select: { name: true, logoId: true } },
+          },
         }),
-      ),
+      );
+      return {
+        id: project.id,
+        name: project.name,
+        companyId: project.companyId,
+        companyName: project.company?.name ?? project.name,
+        logoId: project.company?.logoId ?? project.logoId,
+      };
+    },
   );
   endpoint(
     app,
@@ -305,20 +575,38 @@ export function foundationRoutes(app: Express) {
     'get',
     '/users',
     { permission: 'users.manage', summary: 'List users without credentials', query: pageQuery },
-    async (_ctx, _b, q) => {
-      const [items, total] = await Promise.all([
-        db.user.findMany({
-          where: {
-            accountType: 'STAFF',
-            ...(q.search
-              ? {
+    async (ctx, _b, q) => {
+      const where: Prisma.UserWhereInput = {
+        accountType: 'STAFF',
+        OR: [
+          {
+            companies: {
+              some: { company: { members: { some: { userId: ctx.actor.id } } } },
+            },
+          },
+          {
+            projects: {
+              some: { project: { access: { some: { userId: ctx.actor.id } } } },
+            },
+          },
+          { id: ctx.actor.id },
+        ],
+        ...(q.search
+          ? {
+              AND: [
+                {
                   OR: [
                     { name: { contains: q.search, mode: 'insensitive' } },
                     { email: { contains: q.search, mode: 'insensitive' } },
                   ],
-                }
-              : {}),
-          },
+                },
+              ],
+            }
+          : {}),
+      };
+      const [items, total] = await Promise.all([
+        db.user.findMany({
+          where,
           select: {
             id: true,
             name: true,
@@ -331,19 +619,7 @@ export function foundationRoutes(app: Express) {
           ...pagination(q),
           orderBy: { createdAt: q.sort },
         }),
-        db.user.count({
-          where: {
-            accountType: 'STAFF',
-            ...(q.search
-              ? {
-                  OR: [
-                    { name: { contains: q.search, mode: 'insensitive' } },
-                    { email: { contains: q.search, mode: 'insensitive' } },
-                  ],
-                }
-              : {}),
-          },
-        }),
+        db.user.count({ where }),
       ]);
       return paged(items, total, q);
     },
@@ -387,6 +663,17 @@ export function foundationRoutes(app: Express) {
             projects: { create: b.projectIds.map((projectId) => ({ projectId })) },
           },
           select: { id: true, name: true, email: true, active: true },
+        });
+        const companyIds = (
+          await tx.project.findMany({
+            where: { id: { in: b.projectIds }, companyId: { not: null } },
+            select: { companyId: true },
+            distinct: ['companyId'],
+          })
+        ).flatMap((project) => (project.companyId ? [project.companyId] : []));
+        await tx.companyMember.createMany({
+          data: companyIds.map((companyId) => ({ companyId, userId: user.id })),
+          skipDuplicates: true,
         });
         await audit(tx, ctx, 'user.created', user.id);
         await welcomeUser(tx, user.id);
@@ -539,6 +826,17 @@ export function foundationRoutes(app: Express) {
         });
         await tx.userProjectAccess.createMany({
           data: b.projectIds.map((projectId) => ({ projectId, userId: id(req) })),
+          skipDuplicates: true,
+        });
+        const companyIds = (
+          await tx.project.findMany({
+            where: { id: { in: b.projectIds }, companyId: { not: null } },
+            select: { companyId: true },
+            distinct: ['companyId'],
+          })
+        ).flatMap((project) => (project.companyId ? [project.companyId] : []));
+        await tx.companyMember.createMany({
+          data: companyIds.map((companyId) => ({ companyId, userId: id(req) })),
           skipDuplicates: true,
         });
         await audit(tx, ctx, 'user.access_changed', id(req), b);

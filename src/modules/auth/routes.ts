@@ -133,7 +133,8 @@ export function authRoutes(app: Express) {
             name: true,
             email: true,
             accountType: true,
-            projects: { select: { projectId: true } },
+            projects: { select: { projectId: true, project: { select: { companyId: true } } } },
+            companies: { select: { companyId: true, role: true } },
           },
         }),
       );

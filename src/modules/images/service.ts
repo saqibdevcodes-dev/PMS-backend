@@ -4,6 +4,7 @@ import { found, requireState } from '../../common/errors.js';
 export const purposes = [
   'PROJECT',
   'PROJECT_LOGO',
+  'COMPANY_LOGO',
   'UNIT',
   'FEATURE',
   'CUSTOMER',
@@ -13,6 +14,10 @@ export const purposes = [
 ] as const;
 export type ImagePurpose = (typeof purposes)[number];
 export const imageGrants: Record<ImagePurpose, { write: string[]; read: string[] }> = {
+  COMPANY_LOGO: {
+    write: ['projects.create', 'projects.update'],
+    read: ['projects.read', 'payments.read', 'finance.read', 'reports.read', 'documents.read'],
+  },
   PROJECT_LOGO: {
     write: ['projects.create', 'projects.update'],
     read: ['projects.read', 'payments.read', 'finance.read', 'reports.read', 'documents.read'],
@@ -56,6 +61,24 @@ export async function requireImage(
             })))),
     'IMAGE_SCOPE_MISMATCH',
     'Choose an image uploaded for this record and project.',
+    422,
+  );
+}
+export async function requireCompanyLogo(
+  tx: Tx,
+  ctx: Context,
+  imageId: string | null | undefined,
+  companyId?: string,
+) {
+  if (!imageId) return;
+  const image = found(await tx.imageAsset.findUnique({ where: { id: imageId } }));
+  requireState(
+    image.purpose === 'COMPANY_LOGO' &&
+      (image.uploadedBy === ctx.actor.id ||
+        (!!companyId &&
+          !!(await tx.company.findFirst({ where: { id: companyId, logoId: image.id } })))),
+    'IMAGE_SCOPE_MISMATCH',
+    'Choose a company logo uploaded by you.',
     422,
   );
 }

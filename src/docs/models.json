@@ -109,6 +109,13 @@
           "isRequired": true
         },
         {
+          "name": "companies",
+          "type": "CompanyMember",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
           "name": "sessions",
           "type": "Session",
           "kind": "object",
@@ -297,6 +304,149 @@
         {
           "name": "project",
           "type": "Project",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "Company",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "code",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "logoId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "logo",
+          "type": "ImageAsset",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "address",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "phone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "active",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "members",
+          "type": "CompanyMember",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
+          "name": "projects",
+          "type": "Project",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        }
+      ]
+    },
+    {
+      "name": "CompanyMember",
+      "fields": [
+        {
+          "name": "companyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "role",
+          "type": "CompanyMemberRole",
+          "kind": "enum",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "company",
+          "type": "Company",
+          "kind": "object",
+          "isList": false,
+          "isRequired": true
+        },
+        {
+          "name": "user",
+          "type": "User",
           "kind": "object",
           "isList": false,
           "isRequired": true
@@ -536,6 +686,20 @@
     {
       "name": "Project",
       "fields": [
+        {
+          "name": "companyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isRequired": false
+        },
+        {
+          "name": "company",
+          "type": "Company",
+          "kind": "object",
+          "isList": false,
+          "isRequired": false
+        },
         {
           "name": "logoId",
           "type": "String",
@@ -5855,6 +6019,13 @@
           "isRequired": true
         },
         {
+          "name": "companyLogos",
+          "type": "Company",
+          "kind": "object",
+          "isList": true,
+          "isRequired": true
+        },
+        {
           "name": "id",
           "type": "String",
           "kind": "scalar",
@@ -6122,6 +6293,20 @@
         },
         {
           "name": "CUSTOMER"
+        }
+      ]
+    },
+    {
+      "name": "CompanyMemberRole",
+      "values": [
+        {
+          "name": "OWNER"
+        },
+        {
+          "name": "ADMIN"
+        },
+        {
+          "name": "MEMBER"
         }
       ]
     }

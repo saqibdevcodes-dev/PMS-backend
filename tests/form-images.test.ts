@@ -1671,27 +1671,36 @@ describe('simplified project and payment workflows', () => {
       ).body.code,
     ).toBe('FUTURE_PURCHASE');
   });
-  it('keeps project logos independent of galleries, scoped to members, replaceable and removable', async () => {
-    const logoId = await upload('PROJECT_LOGO');
+  it('keeps company logos independent of project galleries, scoped to company members and reusable by every project', async () => {
+    const logoId = await upload('COMPANY_LOGO');
     const photoId = await upload('PROJECT');
     expect((await get('/images/' + logoId, 'other')).status).toBe(404);
+    const company = await post('/companies').send({
+      name: 'Branded company',
+      logoId,
+    });
+    expect(company.status, company.text).toBe(201);
+    const companyId = company.body.data.id;
     const created = await post('/projects').send({
       name: 'Branded project',
       location: 'Lahore',
-      logoId,
+      companyId,
       photoIds: [photoId],
     });
     expect(created.status, created.text).toBe(201);
     const pid = created.body.data.id;
-    const patch = (body: object, token = 'staff') =>
+    const patchCompany = (body: object, token = 'staff') =>
       request(app)
-        .patch('/api/v1/projects/' + pid)
+        .patch('/api/v1/companies/' + companyId)
         .set('Authorization', 'Bearer ' + token)
         .send(body);
-    expect(created.body.data).toMatchObject({ logoId, photoId, photoIds: [photoId] });
+    expect(created.body.data).toMatchObject({ companyId, photoId, photoIds: [photoId] });
+    expect(created.body.data.logoId).toBeNull();
     expect((await get('/projects/' + pid + '/branding', 'viewer')).body.data).toMatchObject({
       logoId,
       name: 'Branded project',
+      companyId,
+      companyName: 'Branded company',
     });
     expect((await get('/projects/' + pid + '/branding', 'other')).status).toBe(404);
     expect((await get('/images/' + logoId, 'customer')).status).toBe(404);
@@ -1709,12 +1718,15 @@ describe('simplified project and payment workflows', () => {
     });
     expect((await get('/images/' + logoId, 'customer')).status).toBe(200);
     await db.userProjectAccess.create({ data: { userId: otherId, projectId: pid } });
+    await db.companyMember.create({
+      data: { companyId, userId: otherId, role: 'ADMIN' },
+    });
     expect((await get('/images/' + logoId, 'other')).status).toBe(200);
-    expect((await patch({ logoId }, 'other')).status).toBe(200);
-    expect((await patch({ logoId: photoId })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
+    expect((await patchCompany({ logoId }, 'other')).status).toBe(200);
+    expect((await patchCompany({ logoId: photoId })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
     const foreign = await db.imageAsset.create({
       data: {
-        purpose: 'PROJECT_LOGO',
+        purpose: 'COMPANY_LOGO',
         uploadedBy: otherId,
         key: 'foreign.png',
         name: 'foreign.png',
@@ -1722,14 +1734,45 @@ describe('simplified project and payment workflows', () => {
         size: 42,
       },
     });
-    expect((await patch({ logoId: foreign.id })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
-    expect((await patch({ logoId: await upload('PROJECT_LOGO') })).status).toBe(200);
+    expect((await patchCompany({ logoId: foreign.id })).body.code).toBe('IMAGE_SCOPE_MISMATCH');
+    expect((await patchCompany({ logoId: await upload('COMPANY_LOGO') })).status).toBe(200);
     expect((await get('/images/' + logoId, 'customer')).status).toBe(404);
-    const removed = await patch({ logoId: null });
-    expect(removed.body.data).toMatchObject({ logoId: null, photoId, photoIds: [photoId] });
-    const unchanged = await patch({ description: 'Updated details' });
-    expect(unchanged.body.data.logoId).toBeNull();
-    expect((await patch({ logoId }, 'viewer')).status).toBe(403);
+    const removed = await patchCompany({ logoId: null });
+    expect(removed.body.data).toMatchObject({ logoId: null });
+    expect((await patchCompany({ logoId }, 'viewer')).status).toBe(403);
+  });
+  it('isolates company, project and property access between different owners', async () => {
+    const alpha = await post('/companies').send({ name: 'Alpha Property Company' });
+    const beta = await post('/companies', 'other').send({ name: 'Beta Property Company' });
+    expect(alpha.status, alpha.text).toBe(201);
+    expect(beta.status, beta.text).toBe(201);
+
+    const alphaProject = await post('/projects').send({
+      companyId: alpha.body.data.id,
+      name: 'Alpha Project',
+      location: 'Lahore',
+    });
+    const betaProject = await post('/projects', 'other').send({
+      companyId: beta.body.data.id,
+      name: 'Beta Project',
+      location: 'Karachi',
+    });
+    expect(alphaProject.status, alphaProject.text).toBe(201);
+    expect(betaProject.status, betaProject.text).toBe(201);
+
+    const alphaCompanies = await get('/companies');
+    expect(alphaCompanies.body.data.items.map((item: { id: string }) => item.id)).toContain(
+      alpha.body.data.id,
+    );
+    expect(alphaCompanies.body.data.items.map((item: { id: string }) => item.id)).not.toContain(
+      beta.body.data.id,
+    );
+    const filteredProjects = await get('/projects?companyId=' + alpha.body.data.id);
+    expect(filteredProjects.body.data.items.map((item: { id: string }) => item.id)).toEqual([
+      alphaProject.body.data.id,
+    ]);
+    expect((await get('/companies/' + beta.body.data.id)).status).toBe(404);
+    expect((await get('/projects/' + betaProject.body.data.id)).status).toBe(404);
   });
   it('returns ledger names and project branding for vouchers without allowing cross-project reads', async () => {
     const created = await post('/projects').send({ name: 'Voucher project', location: 'Karachi' });

@@ -48,7 +48,7 @@ export function imageRoutes(app: Express) {
         'Image upload permission is required.',
         403,
       );
-      const scoped = !['PROJECT', 'PROJECT_LOGO', 'USER'].includes(body.purpose);
+      const scoped = !['PROJECT', 'PROJECT_LOGO', 'COMPANY_LOGO', 'USER'].includes(body.purpose);
       requireState(
         !scoped || body.projectId,
         'PROJECT_REQUIRED',
@@ -81,19 +81,33 @@ export function imageRoutes(app: Express) {
     },
     async (ctx, _b, _q, req) => {
       const image = found(await db.imageAsset.findUnique({ where: { id: id(req) } }));
-      if (image.purpose === 'PROJECT_LOGO') {
-        const attached = await db.project.findFirst({
-          where: {
-            logoId: image.id,
-            ...(ctx.actor.accountType === 'CUSTOMER'
-              ? { customers: { some: { portalUserId: ctx.actor.id } } }
-              : { access: { some: { userId: ctx.actor.id } } }),
-          },
-        });
+      if (image.purpose === 'PROJECT_LOGO' || image.purpose === 'COMPANY_LOGO') {
+        const attached =
+          image.purpose === 'COMPANY_LOGO'
+            ? await db.company.findFirst({
+                where: {
+                  logoId: image.id,
+                  ...(ctx.actor.accountType === 'CUSTOMER'
+                    ? {
+                        projects: {
+                          some: { customers: { some: { portalUserId: ctx.actor.id } } },
+                        },
+                      }
+                    : { members: { some: { userId: ctx.actor.id } } }),
+                },
+              })
+            : await db.project.findFirst({
+                where: {
+                  logoId: image.id,
+                  ...(ctx.actor.accountType === 'CUSTOMER'
+                    ? { customers: { some: { portalUserId: ctx.actor.id } } }
+                    : { access: { some: { userId: ctx.actor.id } } }),
+                },
+              });
         const ownUpload =
           ctx.actor.accountType !== 'CUSTOMER' &&
           image.uploadedBy === ctx.actor.id &&
-          imageGrants.PROJECT_LOGO.write.some((p) => ctx.actor.permissions.has(p));
+          imageGrants[image.purpose].write.some((p) => ctx.actor.permissions.has(p));
         found(attached || ownUpload ? image : null);
         return {
           url: await signedDownload(image.key, image.name, true),

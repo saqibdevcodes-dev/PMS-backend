@@ -316,12 +316,20 @@ export function financeRoutes(app: Express) {
     'get',
     root + '/journals/:id',
     { permission: 'finance.read', summary: 'Get a project journal voucher with ledger details' },
-    async (ctx, _b, _q, req) =>
-      found(
+    async (ctx, _b, _q, req) => {
+      const journal = found(
         await db.journal.findFirst({
           where: { id: id(req), projectId: ctx.projectId },
           include: {
-            project: { select: { id: true, name: true, currency: true, logoId: true } },
+            project: {
+              select: {
+                id: true,
+                name: true,
+                currency: true,
+                logoId: true,
+                company: { select: { logoId: true } },
+              },
+            },
             lines: {
               include: {
                 account: { select: { code: true, name: true } },
@@ -333,7 +341,17 @@ export function financeRoutes(app: Express) {
             reversalOf: { select: { reference: true } },
           },
         }),
-      ),
+      );
+      return {
+        ...journal,
+        project: {
+          id: journal.project.id,
+          name: journal.project.name,
+          currency: journal.project.currency,
+          logoId: journal.project.company?.logoId ?? journal.project.logoId,
+        },
+      };
+    },
   );
   endpoint(
     app,

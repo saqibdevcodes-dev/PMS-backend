@@ -7,6 +7,7 @@ import { ownedBookings } from './access.js';
 
 export const projectSelect = {
   logoId: true,
+  company: { select: { logoId: true } },
   id: true,
   name: true,
   currency: true,
@@ -101,7 +102,10 @@ export async function dashboard(userId: string) {
       { AND: [ownedBookings(userId), { status: 'CONFIRMED', unit: { projectId: project.id } }] },
       projectDay(project.timezone),
     );
-    accounts.push({ project, ...position });
+    accounts.push({
+      project: { ...project, logoId: project.company?.logoId ?? project.logoId },
+      ...position,
+    });
   }
   // Allocation sums are evaluated in SQL, so fully paid rows never hide the next unpaid installment.
   const upcoming = await db.$queryRaw<

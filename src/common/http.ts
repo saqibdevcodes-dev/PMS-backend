@@ -86,6 +86,14 @@ export function endpoint<
     if (options.permission && !actor.permissions.has(options.permission))
       throw new AppError(403, 'FORBIDDEN', 'You do not have permission for this operation.');
     const projectId = (req.params.projectId as string | undefined) ?? '';
+    const companyId = (req.params.companyId as string | undefined) ?? '';
+    if (
+      companyId &&
+      !(await db.companyMember.findUnique({
+        where: { companyId_userId: { companyId, userId: actor.id } },
+      }))
+    )
+      throw new AppError(404, 'NOT_FOUND', 'The requested company was not found.');
     if (
       projectId &&
       !(await db.userProjectAccess.findUnique({

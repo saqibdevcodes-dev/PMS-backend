@@ -22,12 +22,26 @@ export async function customerStatementReport(
     'Choose a customer to view their statement.',
     422,
   );
-  const project = found(
+  const projectRecord = found(
     await tx.project.findUnique({
       where: { id: projectId },
-      select: { id: true, name: true, logoId: true, currency: true, timezone: true },
+      select: {
+        id: true,
+        name: true,
+        logoId: true,
+        currency: true,
+        timezone: true,
+        company: { select: { logoId: true } },
+      },
     }),
   );
+  const project = {
+    id: projectRecord.id,
+    name: projectRecord.name,
+    logoId: projectRecord.company?.logoId ?? projectRecord.logoId,
+    currency: projectRecord.currency,
+    timezone: projectRecord.timezone,
+  };
   const customer = found(
     await tx.customer.findFirst({
       where: { id: q.customerId, projectId },

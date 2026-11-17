@@ -16,6 +16,9 @@ export async function projectBranding(projectId: string): Promise<DocumentBrandi
         name: true,
         timezone: true,
         logo: { select: { key: true, purpose: true, mime: true } },
+        company: {
+          select: { logo: { select: { key: true, purpose: true, mime: true } } },
+        },
       },
     }),
   );
@@ -23,13 +26,14 @@ export async function projectBranding(projectId: string): Promise<DocumentBrandi
     name: project.name,
     ...(project.timezone ? { timezone: project.timezone } : {}),
   };
-  if (project.logo) {
+  const logo = project.company?.logo ?? project.logo;
+  if (logo) {
     if (
-      project.logo.purpose === 'PROJECT_LOGO' &&
-      ['image/png', 'image/jpeg'].includes(project.logo.mime)
+      ['COMPANY_LOGO', 'PROJECT_LOGO'].includes(logo.purpose) &&
+      ['image/png', 'image/jpeg'].includes(logo.mime)
     ) {
       try {
-        return { ...identity, logo: await readObject(project.logo.key) };
+        return { ...identity, logo: await readObject(logo.key) };
       } catch {
         return identity;
       }
