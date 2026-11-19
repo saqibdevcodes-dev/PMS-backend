@@ -42,7 +42,14 @@ This creates an assigned demo project and four deterministic accounts: the reque
 `sales.test@example.com`, and `customer.test@example.com`. The three test accounts use
 `TestAccount@123`; the customer account is linked to a demo customer profile. The command
 resets these accounts to their documented passwords on every run and refuses to run when
-`NODE_ENV=production`.
+`NODE_ENV=production` unless the operator supplies the explicit, one-command opt-in:
+
+```sh
+ALLOW_PRODUCTION_DEVELOPMENT_SEED=I_UNDERSTAND npm run db:seed:development
+```
+
+Do not store that opt-in in `.env`. Remove or disable deterministic test accounts when they are
+no longer required on an internet-accessible installation.
 
 If the seed reports an existing administrator but login fails, see [administrator login recovery](docs/admin-recovery.md). `npm run admin:status` checks the configured database and account; `npm run admin:reset-password` explicitly applies `ADMIN_PASSWORD` to an existing active Super Admin and revokes its sessions. Run these commands in the same backend environment and database as the API being used.
 

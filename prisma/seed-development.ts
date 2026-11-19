@@ -51,8 +51,19 @@ async function seedRoles() {
 }
 
 async function seedDevelopmentAccounts() {
+  if (
+    env.NODE_ENV === 'production' &&
+    process.env.ALLOW_PRODUCTION_DEVELOPMENT_SEED !== 'I_UNDERSTAND'
+  )
+    throw new Error(
+      'Development accounts cannot be seeded in production without the explicit ' +
+        'ALLOW_PRODUCTION_DEVELOPMENT_SEED=I_UNDERSTAND opt-in.',
+    );
+
   if (env.NODE_ENV === 'production')
-    throw new Error('Development accounts cannot be seeded when NODE_ENV=production.');
+    console.warn(
+      'WARNING: creating deterministic development accounts in the production database.',
+    );
 
   await seedRoles();
 
