@@ -21,6 +21,7 @@
     "db:generate": "prisma generate && node scripts/model-metadata.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:development": "tsx prisma/seed-development.ts",
     "admin:status": "tsx scripts/admin-account.ts status",
     "admin:reset-password": "tsx scripts/admin-account.ts reset-password",
     "storage:import-s3": "node dist/scripts/import-storage.js",

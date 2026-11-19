@@ -31,6 +31,19 @@ The password must contain at least 12 characters, upper and lower case letters, 
 npm run worker
 ```
 
+For local UI and role testing, run the development-only seed after migrations:
+
+```powershell
+npm run db:seed:development
+```
+
+This creates an assigned demo project and four deterministic accounts: the requested
+`binishaqtrader@gmail.com` Super Admin account, `admin.test@example.com`,
+`sales.test@example.com`, and `customer.test@example.com`. The three test accounts use
+`TestAccount@123`; the customer account is linked to a demo customer profile. The command
+resets these accounts to their documented passwords on every run and refuses to run when
+`NODE_ENV=production`.
+
 If the seed reports an existing administrator but login fails, see [administrator login recovery](docs/admin-recovery.md). `npm run admin:status` checks the configured database and account; `npm run admin:reset-password` explicitly applies `ADMIN_PASSWORD` to an existing active Super Admin and revokes its sessions. Run these commands in the same backend environment and database as the API being used.
 
 The API listens on `http://localhost:4000`. Health checks are `/health/live` and `/health/ready`. The API contract is `/api/v1/openapi.json`; its checked-in copy is [docs/openapi.json](docs/openapi.json). Development email is visible at `http://localhost:8025`. Database and Redis ports are 5434 and 6381; they bind to loopback only.
