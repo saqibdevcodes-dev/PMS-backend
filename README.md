@@ -37,12 +37,13 @@ For local UI and role testing, run the development-only seed after migrations:
 npm run db:seed:development
 ```
 
-This creates an assigned demo project and four deterministic accounts: the requested
-`binishaqtrader@gmail.com` Super Admin account, `admin.test@example.com`,
-`sales.test@example.com`, and `customer.test@example.com`. The three test accounts use
-`TestAccount@123`; the customer account is linked to a demo customer profile. The command
-resets these accounts to their documented passwords on every run and refuses to run when
-`NODE_ENV=production` unless the operator supplies the explicit, one-command opt-in:
+This creates only four deterministic user accounts: the requested `binishaqtrader@gmail.com`
+Super Admin account, `admin.test@example.com`, `sales.test@example.com`, and
+`customer.test@example.com`. The three test accounts use `TestAccount@123`. It does not create
+companies, projects, project access, or customer profiles. Run the standard `npm run db:seed`
+first so the required roles exist. The command resets these accounts to their documented
+passwords on every run and refuses to run when `NODE_ENV=production` unless the operator supplies
+the explicit, one-command opt-in:
 
 ```sh
 ALLOW_PRODUCTION_DEVELOPMENT_SEED=I_UNDERSTAND npm run db:seed:development
